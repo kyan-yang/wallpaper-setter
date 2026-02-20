@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { applyWallpaper, buildWallpaperApplyCommand, patchWallpaperStore } = require('../dist/main/wallpaper.js');
+const { applyWallpaper, buildWallpaperApplyCommand, patchWallpaperStoreXml } = require('../dist/main/wallpaper.js');
 
 test('buildWallpaperApplyCommand targets every desktop via System Events', () => {
   const filePath = '/tmp/example wallpaper.jpg';
@@ -48,53 +48,23 @@ test('applyWallpaper executes osascript when wallpaper store is unavailable', ()
   assert.deepEqual(calls[0].options, { timeout: 10000 });
 });
 
-test('patchWallpaperStore updates every Desktop file reference', () => {
-  const store = JSON.stringify({
-    Spaces: {
-      A: {
-        Default: {
-          Desktop: {
-            Content: {
-              Choices: [
-                { Files: [{ relative: 'file:///old-a.jpg' }] },
-              ],
-            },
-          },
-        },
-      },
-      B: {
-        Displays: {
-          Display1: {
-            Desktop: {
-              Content: {
-                Choices: [
-                  { Files: [{ relative: 'file:///old-b.jpg' }] },
-                ],
-              },
-            },
-          },
-        },
-      },
-    },
-    SystemDefault: {
-      Desktop: {
-        Content: {
-          Choices: [
-            { Files: [{ relative: 'file:///old-default.jpg' }] },
-          ],
-        },
-      },
-    },
-  });
+test('patchWallpaperStoreXml updates every relative wallpaper file reference', () => {
+  const storeXml = [
+    '<plist version="1.0"><dict>',
+    '<key>Spaces</key><dict>',
+    '<key>A</key><dict><key>relative</key><string>file:///old-a.jpg</string></dict>',
+    '<key>B</key><dict><key>relative</key><string>file:///old-b.jpg</string></dict>',
+    '</dict>',
+    '<key>SystemDefault</key><dict><key>relative</key><string>file:///old-default.jpg</string></dict>',
+    '</dict></plist>',
+  ].join('');
 
-  const nextURL = 'file:///Users/example/new%20wallpaper.jpg';
-  const result = patchWallpaperStore(store, nextURL);
-  const next = JSON.parse(result.rawStoreJson);
+  const nextURL = 'file:///Users/example/new & wallpaper.jpg';
+  const result = patchWallpaperStoreXml(storeXml, nextURL);
 
   assert.equal(result.updates, 3);
-  assert.equal(next.Spaces.A.Default.Desktop.Content.Choices[0].Files[0].relative, nextURL);
-  assert.equal(next.Spaces.B.Displays.Display1.Desktop.Content.Choices[0].Files[0].relative, nextURL);
-  assert.equal(next.SystemDefault.Desktop.Content.Choices[0].Files[0].relative, nextURL);
+  assert.match(result.rawStoreXml, /file:\/\/\/Users\/example\/new &amp; wallpaper\.jpg/);
+  assert.doesNotMatch(result.rawStoreXml, /file:\/\/\/old-/);
 });
 
 test('applyWallpaper patches wallpaper store and refreshes wallpaper agent', () => {
@@ -108,19 +78,37 @@ test('applyWallpaper patches wallpaper store and refreshes wallpaper agent', () 
   fs.mkdirSync(path.dirname(storePath), { recursive: true });
   fs.writeFileSync(storePath, 'placeholder');
 
-  const sampleStore = JSON.stringify({
-    Spaces: {
-      Space1: {
-        Default: {
-          Desktop: {
-            Content: {
-              Choices: [{ Files: [{ relative: 'file:///old.jpg' }] }],
-            },
-          },
-        },
-      },
-    },
-  });
+  const sampleStoreXml = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<plist version="1.0">',
+    '<dict>',
+    '<key>Spaces</key>',
+    '<dict>',
+    '<key>Space1</key>',
+    '<dict>',
+    '<key>Default</key>',
+    '<dict>',
+    '<key>Desktop</key>',
+    '<dict>',
+    '<key>Content</key>',
+    '<dict>',
+    '<key>Choices</key>',
+    '<array>',
+    '<dict>',
+    '<key>Files</key>',
+    '<array>',
+    '<dict><key>relative</key><string>file:///old.jpg</string></dict>',
+    '</array>',
+    '</dict>',
+    '</array>',
+    '</dict>',
+    '</dict>',
+    '</dict>',
+    '</dict>',
+    '</dict>',
+    '</dict>',
+    '</plist>',
+  ].join('');
 
   try {
     applyWallpaper(filePath, {
@@ -130,9 +118,9 @@ test('applyWallpaper patches wallpaper store and refreshes wallpaper agent', () 
       execSync: (command, args, options) => {
         commandCalls.push({ command, args, options });
 
-        if (command === 'plutil' && args[0] === '-convert' && args[1] === 'json') {
-          const jsonPath = args[3];
-          fs.writeFileSync(jsonPath, sampleStore);
+        if (command === 'plutil' && args[0] === '-convert' && args[1] === 'xml1') {
+          const xmlPath = args[3];
+          fs.writeFileSync(xmlPath, sampleStoreXml);
         }
 
         if (command === 'plutil' && args[0] === '-convert' && args[1] === 'binary1') {
@@ -147,12 +135,11 @@ test('applyWallpaper patches wallpaper store and refreshes wallpaper agent', () 
   }
 
   assert.equal(commandCalls[0].command, 'osascript');
-  assert.ok(commandCalls.some((call) => call.command === 'plutil' && call.args[1] === 'json'));
+  assert.ok(commandCalls.some((call) => call.command === 'plutil' && call.args[1] === 'xml1'));
   assert.ok(commandCalls.some((call) => call.command === 'plutil' && call.args[1] === 'binary1'));
   assert.ok(commandCalls.some((call) => call.command === 'killall' && call.args[0] === 'WallpaperAgent'));
 
-  const patched = JSON.parse(rewrittenStore);
-  assert.match(patched.Spaces.Space1.Default.Desktop.Content.Choices[0].Files[0].relative, /file:\/\/\/tmp\/wallpaper%20space\.png$/);
+  assert.match(rewrittenStore, /file:\/\/\/tmp\/wallpaper%20space\.png/);
 });
 
 test('applyWallpaper surfaces AppleScript stderr details', () => {

@@ -60,72 +60,26 @@ function fileURL(filePath: string): string {
   return pathToFileURL(filePath).toString();
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+function xmlEscape(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
 }
 
-function updateDesktopChoices(node: unknown, targetFileURL: string): number {
-  if (!isRecord(node)) {
-    return 0;
-  }
-
-  const desktop = node.Desktop;
-  if (!isRecord(desktop)) {
-    return 0;
-  }
-
-  const content = desktop.Content;
-  if (!isRecord(content)) {
-    return 0;
-  }
-
-  const choices = content.Choices;
-  if (!Array.isArray(choices)) {
-    return 0;
-  }
+export function patchWallpaperStoreXml(rawStoreXml: string, targetFileURL: string): { rawStoreXml: string; updates: number } {
+  const escapedURL = xmlEscape(targetFileURL);
+  const relativeFileValuePattern = /(<key>\s*relative\s*<\/key>\s*<string>)[^<]*(<\/string>)/g;
 
   let updates = 0;
-  for (const choice of choices) {
-    if (!isRecord(choice) || !Array.isArray(choice.Files)) {
-      continue;
-    }
+  const nextXml = rawStoreXml.replace(relativeFileValuePattern, (_match, prefix: string, suffix: string) => {
+    updates += 1;
+    return `${prefix}${escapedURL}${suffix}`;
+  });
 
-    for (const fileNode of choice.Files) {
-      if (!isRecord(fileNode)) {
-        continue;
-      }
-
-      if (typeof fileNode.relative === 'string') {
-        fileNode.relative = targetFileURL;
-        updates += 1;
-      }
-    }
-  }
-
-  return updates;
-}
-
-export function patchWallpaperStore(rawStoreJson: string, targetFileURL: string): { rawStoreJson: string; updates: number } {
-  const parsed = JSON.parse(rawStoreJson) as unknown;
-
-  const pending: unknown[] = [parsed];
-  let updates = 0;
-  while (pending.length > 0) {
-    const candidate = pending.pop();
-    if (Array.isArray(candidate)) {
-      pending.push(...candidate);
-      continue;
-    }
-
-    if (!isRecord(candidate)) {
-      continue;
-    }
-
-    updates += updateDesktopChoices(candidate, targetFileURL);
-    pending.push(...Object.values(candidate));
-  }
-
-  return { rawStoreJson: JSON.stringify(parsed), updates };
+  return { rawStoreXml: nextXml, updates };
 }
 
 function execErrorMessage(error: unknown): string {
@@ -153,17 +107,17 @@ function syncWallpaperStore(filePath: string, dependencies: WallpaperDependencie
   }
 
   const tempDir = dependencies.mkdtempSync(path.join(dependencies.tmpdir(), 'wallpaper-store-'));
-  const jsonPath = path.join(tempDir, 'index.json');
+  const xmlPath = path.join(tempDir, 'index.xml');
 
   try {
-    dependencies.execSync('plutil', ['-convert', 'json', '-o', jsonPath, storePath], { timeout: 10000 });
-    const rawStoreJson = dependencies.readFileSync(jsonPath, 'utf8');
-    const patchResult = patchWallpaperStore(rawStoreJson, fileURL(filePath));
+    dependencies.execSync('plutil', ['-convert', 'xml1', '-o', xmlPath, storePath], { timeout: 10000 });
+    const rawStoreXml = dependencies.readFileSync(xmlPath, 'utf8');
+    const patchResult = patchWallpaperStoreXml(rawStoreXml, fileURL(filePath));
     if (patchResult.updates === 0) {
       throw new Error('No desktop wallpaper entries were found in macOS wallpaper store.');
     }
-    dependencies.writeFileSync(jsonPath, patchResult.rawStoreJson);
-    dependencies.execSync('plutil', ['-convert', 'binary1', '-o', storePath, jsonPath], { timeout: 10000 });
+    dependencies.writeFileSync(xmlPath, patchResult.rawStoreXml);
+    dependencies.execSync('plutil', ['-convert', 'binary1', '-o', storePath, xmlPath], { timeout: 10000 });
 
     try {
       dependencies.execSync('killall', ['WallpaperAgent'], { timeout: 5000 });
