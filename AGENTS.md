@@ -66,23 +66,12 @@ Build a wallpaper setter app with premium UI/UX: fast browsing, delightful previ
 - If architecture choices conflict, pick the option that keeps UI iteration fastest.
 - If uncertain, ship a minimal stable path first, then iterate with measured polish.
 
-## Debugging & Fixing Discipline
-- Start from symptoms, not assumptions. Reproduce the exact user-visible failure first and capture the real command/output that fails.
-- Validate each critical assumption with a direct check before coding (file format, process behavior, API scope, permissions, runtime environment).
-- Prefer narrow experiments over large rewrites. Prove or falsify one hypothesis at a time.
-- Treat “it should work” as untrusted until observed in this environment.
-- Design fixes around the real failure mode, not a generic abstraction. Keep the first successful fix minimal and explicit.
-- Fail loudly with context. Bubble up original stderr/stdout details so users and future agents can diagnose quickly.
-- Add a test seam before deep fixes when possible (dependency injection or pure transform helpers). This allows deterministic regression tests.
-- Validate fixes twice: automated checks (tests/build) and realistic manual behavior checks for the user flow.
-- If the first fix fails, do a short postmortem before the next attempt: what assumption was wrong, what evidence was missing, what to test next.
-- Record durable learnings in `AGENTS.md` immediately after resolution so future agents avoid repeating dead ends.
-
-## Root-Cause Prevention
-- Primary failure pattern to avoid: assumption-driven fixes. If behavior depends on OS internals, verify with runtime evidence before implementation.
-- Never infer scope from API names alone (for example, display-level vs space-level behavior). Confirm actual scope in a live environment.
-- Before merging adapter changes, run a minimum validation matrix that matches real usage: single desktop, multiple Spaces, multiple displays, and denied permissions.
-- Use representative system artifacts in tests whenever possible. Synthetic fixtures alone are not enough for platform integration code.
-- Guard risky integration steps with explicit preflight checks (format compatibility, file existence, command availability) and actionable errors.
-- Prefer incremental rollout inside the adapter: add one mechanism, verify, then add the next. Do not stack unverified fixes.
-- When a fix fails in production-like use, require a brief written postmortem in the PR/commit notes before attempting the next fix.
+## Evidence-Driven Execution
+- Start from symptoms, not assumptions. Reproduce the exact user-visible failure and capture the real failing command/output before coding.
+- Validate critical assumptions with direct checks (file format, API scope, permissions, runtime environment). Do not infer behavior from API names alone.
+- Use one hypothesis per experiment. Prefer narrow, reversible changes over broad rewrites.
+- For platform adapter changes, run a minimum validation matrix before merge: denied permissions, single/multi display, and single/multi Spaces.
+- Use representative system artifacts in tests for integration code; synthetic fixtures are complementary, not sufficient.
+- Fail loudly with context. Surface original stderr/stdout and explicit preflight failures.
+- Verify fixes twice: automated checks (tests/build) and realistic manual behavior checks on the user flow.
+- If a fix fails, write a short postmortem (bad assumption, missing evidence, next test) and update `AGENTS.md` with durable learnings.
