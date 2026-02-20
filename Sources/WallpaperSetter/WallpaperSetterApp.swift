@@ -1,7 +1,14 @@
 import SwiftUI
 
+class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return true
+    }
+}
+
 @main
 struct WallpaperSetterApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var store: WallpaperStateStore
 
     init() {
@@ -33,7 +40,9 @@ struct WallpaperSetterApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(store: store)
-                .frame(minWidth: 980, minHeight: 680)
+                .frame(minWidth: 860, minHeight: 600)
         }
+        .windowStyle(.titleBar)
+        .windowToolbarStyle(.unified(showsTitle: false))
     }
 }

@@ -12,12 +12,15 @@ final class WallpaperStateStore: ObservableObject {
     @Published var goalsDraft: GoalsDraft = .empty
     @Published var lastAppliedURL: URL?
     @Published var isBusy = false
+    @Published var cropState: CropState = .initial
 
     private let adapter: WallpaperAdapter
     private let renderer: GoalsRenderer
     private let persistence: WallpaperPersistence
     private let screenProvider: () -> [NSScreen]
     private let renderSizeProvider: () -> CGSize
+    private var cancellables = Set<AnyCancellable>()
+    private var autoPreviewTask: Task<Void, Never>?
 
     init(
         adapter: WallpaperAdapter,
@@ -33,6 +36,15 @@ final class WallpaperStateStore: ObservableObject {
         self.persistence = persistence
         self.screenProvider = screenProvider
         self.renderSizeProvider = renderSizeProvider
+
+        $goalsDraft
+            .dropFirst()
+            .removeDuplicates()
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.autoGeneratePreview()
+            }
+            .store(in: &cancellables)
     }
 
     func bootstrap() {
@@ -54,6 +66,7 @@ final class WallpaperStateStore: ObservableObject {
     func selectImage(url: URL) {
         selectedImageURL = url
         previewImage = NSImage(contentsOf: url)
+        cropState = .initial
         applyStatus = .idle
     }
 
@@ -67,14 +80,91 @@ final class WallpaperStateStore: ObservableObject {
             lastError = .fileNotFound(path: "No file selected")
             return
         }
-        await apply(url: selectedImageURL, source: .localImage, metadata: [:])
+
+        if !cropState.isDefault, let previewImage {
+            await applyCropped(originalImage: previewImage, originalURL: selectedImageURL)
+        } else {
+            await apply(url: selectedImageURL, source: .localImage, metadata: [:])
+        }
     }
 
-    func generateAndSelectGoalsWallpaper() {
-        Task { await generateAndSelectGoalsWallpaperAsync() }
+    func resetCrop() {
+        cropState = .initial
     }
 
-    func generateAndSelectGoalsWallpaperAsync() async {
+    private func applyCropped(originalImage: NSImage, originalURL: URL) async {
+        isBusy = true
+        applyStatus = .applying
+        defer { isBusy = false }
+
+        do {
+            let state = cropState
+            let screenSize = renderSizeProvider()
+            let croppedImage = try await runBackground {
+                guard let cropped = ImageCropper.crop(
+                    image: originalImage,
+                    cropState: state,
+                    screenSize: screenSize
+                ) else {
+                    throw WallpaperError.renderFailed(reason: "Could not crop image", underlying: nil)
+                }
+                return cropped
+            }
+
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            let croppedDir = appSupport
+                .appendingPathComponent("WallpaperSetter", isDirectory: true)
+                .appendingPathComponent("Cropped", isDirectory: true)
+            try FileManager.default.createDirectory(at: croppedDir, withIntermediateDirectories: true)
+
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyyMMdd-HHmmss"
+            let filename = "cropped-\(formatter.string(from: Date())).png"
+            let croppedURL = croppedDir.appendingPathComponent(filename)
+
+            try await runBackground {
+                try ImageCropper.savePNG(croppedImage, to: croppedURL)
+            }
+
+            let screens = screenProvider()
+            try await runBackground {
+                try self.adapter.applyWallpaper(from: croppedURL, to: screens)
+            }
+
+            let entry = WallpaperHistoryEntry(
+                id: UUID(),
+                fileURL: croppedURL,
+                createdAt: Date(),
+                source: .localImage,
+                metadata: ["originalFile": originalURL.lastPathComponent]
+            )
+            history.insert(entry, at: 0)
+            lastAppliedURL = croppedURL
+            applyStatus = .success(message: "Wallpaper applied.")
+            let latestHistory = history
+            try await runBackground {
+                try self.persistence.saveHistory(latestHistory)
+                try self.persistence.saveLastApplied(croppedURL)
+            }
+        } catch let error as WallpaperError {
+            lastError = error
+            applyStatus = .failure(message: error.errorDescription ?? "Apply failed")
+        } catch {
+            let wrapped = WallpaperError.applyFailed(
+                reason: error.localizedDescription, underlying: String(describing: error)
+            )
+            lastError = wrapped
+            applyStatus = .failure(message: wrapped.errorDescription ?? "Apply failed")
+        }
+    }
+
+    private func autoGeneratePreview() {
+        autoPreviewTask?.cancel()
+        autoPreviewTask = Task { await generatePreviewAsync() }
+    }
+
+    func generatePreviewAsync() async {
         guard !isBusy else { return }
         isBusy = true
         defer { isBusy = false }
@@ -85,12 +175,14 @@ final class WallpaperStateStore: ObservableObject {
             let rendered = try await runBackground {
                 try self.renderer.render(draft: draft, outputSize: outputSize)
             }
+            guard !Task.isCancelled else { return }
             selectedImageURL = rendered.fileURL
             previewImage = NSImage(contentsOf: rendered.fileURL)
+            cropState = .initial
             try await runBackground {
                 try self.persistence.saveGoalsDraft(draft)
             }
-            applyStatus = .success(message: "Goals wallpaper generated.")
+            applyStatus = .idle
         } catch let error as WallpaperError {
             lastError = error
             applyStatus = .failure(message: error.errorDescription ?? "Generation failed")

@@ -40,6 +40,18 @@ struct RenderedWallpaper: Sendable {
     let size: CGSize
 }
 
+struct CropState: Equatable {
+    var offset: CGSize = .zero
+    var zoom: CGFloat = 1.0
+    var containerSize: CGSize = .zero
+
+    static let initial = CropState()
+
+    var isDefault: Bool {
+        offset == .zero && zoom == 1.0
+    }
+}
+
 enum ApplyStatus: Sendable, Equatable {
     case idle
     case applying

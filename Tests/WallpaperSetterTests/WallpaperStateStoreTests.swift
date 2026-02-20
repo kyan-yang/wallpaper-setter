@@ -64,7 +64,7 @@ final class WallpaperStateStoreTests: XCTestCase {
         )
         store.goalsDraft = GoalsDraft(title: "Focus", goalsText: "Ship MVP", theme: .minimalDark)
 
-        await store.generateAndSelectGoalsWallpaperAsync()
+        await store.generatePreviewAsync()
 
         XCTAssertNotNil(store.selectedImageURL)
         XCTAssertEqual(store.goalsDraft, persistence.draft)
