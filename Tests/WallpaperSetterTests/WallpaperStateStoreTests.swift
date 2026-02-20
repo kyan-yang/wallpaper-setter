@@ -1,6 +1,7 @@
 import XCTest
 import AppKit
 @testable import WallpaperSetter
+@testable import WallpaperSetterCore
 
 final class WallpaperStateStoreTests: XCTestCase {
     @MainActor

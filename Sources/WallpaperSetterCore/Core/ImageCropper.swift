@@ -1,8 +1,8 @@
 import AppKit
 import CoreGraphics
 
-enum ImageCropper {
-    static func crop(
+public enum ImageCropper {
+    public static func crop(
         image: NSImage,
         cropState: CropState,
         screenSize: CGSize
@@ -78,7 +78,7 @@ enum ImageCropper {
         return result
     }
 
-    static func savePNG(_ image: NSImage, to url: URL) throws {
+    public static func savePNG(_ image: NSImage, to url: URL) throws {
         guard let tiffData = image.tiffRepresentation,
               let rep = NSBitmapImageRep(data: tiffData),
               let pngData = rep.representation(using: .png, properties: [:]) else {

@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Combine
+import WallpaperSetterCore
 
 @MainActor
 final class WallpaperStateStore: ObservableObject {

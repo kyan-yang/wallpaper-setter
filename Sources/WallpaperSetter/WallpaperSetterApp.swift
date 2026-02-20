@@ -1,4 +1,5 @@
 import SwiftUI
+import WallpaperSetterCore
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -40,7 +41,7 @@ struct WallpaperSetterApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(store: store)
-                .frame(minWidth: 860, minHeight: 600)
+                .frame(minWidth: 900, minHeight: 620)
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: false))

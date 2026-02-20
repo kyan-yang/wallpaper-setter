@@ -6,3 +6,7 @@ dist/
 default.profraw
 .DS_Store
 .vscode/
+
+# Electron
+electron/node_modules/
+electron/dist/

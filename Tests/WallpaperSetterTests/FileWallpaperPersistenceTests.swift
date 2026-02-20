@@ -1,5 +1,5 @@
 import XCTest
-@testable import WallpaperSetter
+@testable import WallpaperSetterCore
 
 final class FileWallpaperPersistenceTests: XCTestCase {
     func testRoundTripHistoryDraftAndLastApplied() throws {

@@ -1,6 +1,6 @@
 import Foundation
 
-protocol WallpaperPersistence {
+public protocol WallpaperPersistence {
     func loadHistory() throws -> [WallpaperHistoryEntry]
     func saveHistory(_ entries: [WallpaperHistoryEntry]) throws
 

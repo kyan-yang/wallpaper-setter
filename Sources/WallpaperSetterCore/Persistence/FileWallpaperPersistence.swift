@@ -1,6 +1,6 @@
 import Foundation
 
-struct FileWallpaperPersistence: WallpaperPersistence {
+public struct FileWallpaperPersistence: WallpaperPersistence {
     private struct PersistenceEnvelope: Codable {
         var history: [WallpaperHistoryEntry]
         var goalsDraft: GoalsDraft
@@ -12,7 +12,7 @@ struct FileWallpaperPersistence: WallpaperPersistence {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
-    init(
+    public init(
         fileManager: FileManager = .default,
         appFolderName: String = "WallpaperSetter",
         storageDirectory: URL? = nil
@@ -35,33 +35,33 @@ struct FileWallpaperPersistence: WallpaperPersistence {
         try createParentDirectoryIfNeeded()
     }
 
-    func loadHistory() throws -> [WallpaperHistoryEntry] {
+    public func loadHistory() throws -> [WallpaperHistoryEntry] {
         try loadEnvelope().history
     }
 
-    func saveHistory(_ entries: [WallpaperHistoryEntry]) throws {
+    public func saveHistory(_ entries: [WallpaperHistoryEntry]) throws {
         var envelope = try loadEnvelope()
         envelope.history = entries
         try saveEnvelope(envelope)
     }
 
-    func loadGoalsDraft() throws -> GoalsDraft {
+    public func loadGoalsDraft() throws -> GoalsDraft {
         try loadEnvelope().goalsDraft
     }
 
-    func saveGoalsDraft(_ draft: GoalsDraft) throws {
+    public func saveGoalsDraft(_ draft: GoalsDraft) throws {
         var envelope = try loadEnvelope()
         envelope.goalsDraft = draft
         try saveEnvelope(envelope)
     }
 
-    func loadLastApplied() throws -> URL? {
+    public func loadLastApplied() throws -> URL? {
         let path = try loadEnvelope().lastAppliedPath
         guard let path else { return nil }
         return URL(fileURLWithPath: path)
     }
 
-    func saveLastApplied(_ url: URL?) throws {
+    public func saveLastApplied(_ url: URL?) throws {
         var envelope = try loadEnvelope()
         envelope.lastAppliedPath = url?.path
         try saveEnvelope(envelope)

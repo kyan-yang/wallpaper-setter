@@ -1,6 +1,6 @@
 import Foundation
 
-enum WallpaperError: Error, LocalizedError, Sendable, Equatable {
+public enum WallpaperError: Error, LocalizedError, Sendable, Equatable {
     case fileNotFound(path: String)
     case unsupportedFormat(path: String, supported: [String])
     case applyFailed(reason: String, underlying: String?)
@@ -9,7 +9,7 @@ enum WallpaperError: Error, LocalizedError, Sendable, Equatable {
     case renderFailed(reason: String, underlying: String?)
     case emptyGoals
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .fileNotFound:
             return "File not found"
@@ -28,7 +28,7 @@ enum WallpaperError: Error, LocalizedError, Sendable, Equatable {
         }
     }
 
-    var recoverySuggestion: String? {
+    public var recoverySuggestion: String? {
         switch self {
         case let .fileNotFound(path):
             return "Verify that the file still exists at \(path)."

@@ -1,4 +1,5 @@
 import SwiftUI
+import WallpaperSetterCore
 
 struct CropPreviewView: View {
     let image: NSImage

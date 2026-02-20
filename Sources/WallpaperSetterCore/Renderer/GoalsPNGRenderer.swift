@@ -2,16 +2,16 @@ import Foundation
 import AppKit
 import CoreGraphics
 
-struct GoalsPNGRenderer: GoalsRenderer {
+public struct GoalsPNGRenderer: GoalsRenderer {
     private let outputDirectory: URL
     private let fileManager: FileManager
 
-    init(outputDirectory: URL, fileManager: FileManager = .default) {
+    public init(outputDirectory: URL, fileManager: FileManager = .default) {
         self.outputDirectory = outputDirectory
         self.fileManager = fileManager
     }
 
-    func render(draft: GoalsDraft, outputSize: CGSize) throws -> RenderedWallpaper {
+    public func render(draft: GoalsDraft, outputSize: CGSize) throws -> RenderedWallpaper {
         let trimmed = draft.goalsText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             throw WallpaperError.emptyGoals

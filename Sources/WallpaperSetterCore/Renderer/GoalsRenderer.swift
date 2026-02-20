@@ -1,6 +1,6 @@
 import Foundation
 import CoreGraphics
 
-protocol GoalsRenderer {
+public protocol GoalsRenderer {
     func render(draft: GoalsDraft, outputSize: CGSize) throws -> RenderedWallpaper
 }
