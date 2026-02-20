@@ -9,7 +9,7 @@ export interface HistoryEntry {
 export interface GoalsDraft {
   title: string;
   goalsText: string;
-  theme: 'minimalDark' | 'minimalLight';
+  theme: string;
 }
 
 export interface BootstrapData {

@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import type { GoalsDraft } from '../types';
+import { normalizeThemeColor } from '../../shared/goals-theme';
+import { HexColorInput, HexColorPicker } from 'react-colorful';
 
 interface GoalsEditorProps {
   draft: GoalsDraft;
@@ -12,6 +14,7 @@ interface GoalsEditorProps {
 
 export function GoalsEditor({ draft, previewPath, isBusy, onDraftChange, onGenerate, onApply }: GoalsEditorProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const selectedThemeColor = normalizeThemeColor(draft.theme);
 
   const updateDraft = useCallback((partial: Partial<GoalsDraft>) => {
     const updated = { ...draft, ...partial };
@@ -113,20 +116,45 @@ export function GoalsEditor({ draft, previewPath, isBusy, onDraftChange, onGener
 
         {/* Theme */}
         <div>
-          <Label text="Theme" />
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-            <ThemeChip
-              label="Dark"
-              color="#1E1E1E"
-              isSelected={draft.theme === 'minimalDark'}
-              onClick={() => updateDraft({ theme: 'minimalDark' })}
+          <Label text="Theme color" />
+          <div style={{
+            padding: 'var(--space-3)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-lg)',
+            background: 'var(--bg-elevated)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-3)',
+          }}>
+            <HexColorPicker
+              className="goals-theme-picker"
+              color={selectedThemeColor}
+              onChange={(nextColor) => updateDraft({ theme: normalizeThemeColor(nextColor) })}
             />
-            <ThemeChip
-              label="Light"
-              color="#EBEBEB"
-              isSelected={draft.theme === 'minimalLight'}
-              onClick={() => updateDraft({ theme: 'minimalLight' })}
-            />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+            }}>
+              <div
+                aria-hidden
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '999px',
+                  background: selectedThemeColor,
+                  border: '1px solid var(--border)',
+                  flexShrink: 0,
+                }}
+              />
+              <HexColorInput
+                aria-label="Theme color hex input"
+                className="goals-theme-input"
+                color={selectedThemeColor}
+                onChange={(nextColor) => updateDraft({ theme: normalizeThemeColor(nextColor) })}
+                prefixed
+              />
+            </div>
           </div>
         </div>
 
@@ -202,40 +230,5 @@ function Label({ text }: { text: string }) {
     }}>
       {text}
     </div>
-  );
-}
-
-function ThemeChip({ label, color, isSelected, onClick }: {
-  label: string;
-  color: string;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 'var(--space-1)',
-        cursor: 'pointer',
-      }}
-    >
-      <div style={{
-        width: '44px',
-        height: '28px',
-        borderRadius: 'var(--radius-md)',
-        background: color,
-        border: isSelected
-          ? '2px solid var(--accent)'
-          : '1px solid var(--border)',
-        transition: `border-color var(--duration-fast) var(--ease-out)`,
-      }} />
-      <span style={{
-        fontSize: '10px',
-        color: isSelected ? 'var(--text-primary)' : 'var(--text-tertiary)',
-      }}>{label}</span>
-    </button>
   );
 }

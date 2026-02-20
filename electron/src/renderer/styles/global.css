@@ -76,6 +76,58 @@ button {
   outline: none;
 }
 
+/* Goals theme picker (react-colorful overrides) */
+.goals-theme-picker.react-colorful {
+  width: 100%;
+  height: 188px;
+}
+
+.goals-theme-picker .react-colorful__saturation {
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-bottom-width: 10px;
+}
+
+.goals-theme-picker .react-colorful__hue {
+  height: 20px;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.goals-theme-picker .react-colorful__hue-pointer {
+  width: 14px;
+  height: 100%;
+  border-radius: 6px;
+  transform: translate(-50%, 0);
+  top: 0;
+}
+
+.goals-theme-picker .react-colorful__pointer {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+}
+
+.goals-theme-picker .react-colorful__interactive:focus .react-colorful__pointer {
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.goals-theme-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.goals-theme-input:focus {
+  border-color: var(--border-focus);
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }

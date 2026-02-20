@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { DEFAULT_GOALS_THEME_COLOR, normalizeGoalsDraft } from '../shared/goals-theme';
 
 interface HistoryEntry {
   id: string;
@@ -24,9 +25,19 @@ interface StateEnvelope {
 
 const DEFAULT_STATE: StateEnvelope = {
   history: [],
-  goalsDraft: { title: '', goalsText: '', theme: 'minimalDark' },
+  goalsDraft: { title: '', goalsText: '', theme: DEFAULT_GOALS_THEME_COLOR },
   lastAppliedPath: null,
 };
+
+function normalizeStateEnvelope(state: unknown): StateEnvelope {
+  const source = (state && typeof state === 'object') ? state as Record<string, unknown> : {};
+
+  return {
+    history: Array.isArray(source.history) ? source.history as HistoryEntry[] : [],
+    goalsDraft: normalizeGoalsDraft(source.goalsDraft),
+    lastAppliedPath: typeof source.lastAppliedPath === 'string' ? source.lastAppliedPath : null,
+  };
+}
 
 function storagePath(): string {
   return path.join(app.getPath('userData'), 'state.json');
@@ -36,7 +47,7 @@ function load(): StateEnvelope {
   const p = storagePath();
   if (!fs.existsSync(p)) return { ...DEFAULT_STATE, history: [] };
   try {
-    return JSON.parse(fs.readFileSync(p, 'utf-8'));
+    return normalizeStateEnvelope(JSON.parse(fs.readFileSync(p, 'utf-8')));
   } catch {
     return { ...DEFAULT_STATE, history: [] };
   }
@@ -66,7 +77,7 @@ export function saveLastApplied(filePath: string): void {
 
 export function saveGoalsDraft(draft: GoalsDraft): void {
   const state = load();
-  state.goalsDraft = draft;
+  state.goalsDraft = normalizeGoalsDraft(draft);
   save(state);
 }
 

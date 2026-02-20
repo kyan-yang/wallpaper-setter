@@ -6,6 +6,7 @@ import { Preview } from './components/Preview';
 import { GoalsEditor } from './components/GoalsEditor';
 import { Toast } from './components/Toast';
 import { renderGoals } from './lib/render-goals';
+import { DEFAULT_GOALS_THEME_COLOR, normalizeGoalsDraft } from '../shared/goals-theme';
 
 function isError(result: any): result is AppError {
   return result && result.error === true;
@@ -17,7 +18,7 @@ export function App() {
   const [goalsDraft, setGoalsDraft] = useState<GoalsDraft>({
     title: '',
     goalsText: '',
-    theme: 'minimalDark',
+    theme: DEFAULT_GOALS_THEME_COLOR,
   });
   const [lastAppliedPath, setLastAppliedPath] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -40,7 +41,7 @@ export function App() {
         return;
       }
       setHistory(data.history);
-      setGoalsDraft(data.goalsDraft);
+      setGoalsDraft(normalizeGoalsDraft(data.goalsDraft));
       setLastAppliedPath(data.lastAppliedPath);
       if (data.lastAppliedPath) {
         setSelectedPath(data.lastAppliedPath);

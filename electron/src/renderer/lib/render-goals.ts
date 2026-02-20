@@ -1,4 +1,5 @@
 import type { GoalsDraft } from '../types';
+import { buildThemePalette } from '../../shared/goals-theme';
 
 export async function renderGoals(
   draft: GoalsDraft,
@@ -9,20 +10,16 @@ export async function renderGoals(
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d')!;
+  const palette = buildThemePalette(draft.theme);
 
   // Background gradient (top to bottom)
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  if (draft.theme === 'minimalDark') {
-    gradient.addColorStop(0, '#1F1F1F');
-    gradient.addColorStop(1, '#333333');
-  } else {
-    gradient.addColorStop(0, '#F2F2F2');
-    gradient.addColorStop(1, '#D6D6D6');
-  }
+  gradient.addColorStop(0, palette.gradientTopHex);
+  gradient.addColorStop(1, palette.gradientBottomHex);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
-  const textColor = draft.theme === 'minimalDark' ? '255,255,255' : '0,0,0';
+  const textColor = palette.textRgb;
   const horizontalInset = width * 0.08;
   const maxWidth = width - horizontalInset * 2;
   let y = height * 0.28;
