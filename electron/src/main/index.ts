@@ -14,6 +14,10 @@ function applyFailureSuggestion(message: string): string {
     return 'Allow Automation for System Events in System Settings > Privacy & Security > Automation, then retry.';
   }
 
+  if (/synchronize wallpaper across spaces/i.test(message)) {
+    return 'Open System Settings > Wallpaper and set this image to “Show on All Spaces”, then retry Apply.';
+  }
+
   return 'Try another image or retry.';
 }
 
