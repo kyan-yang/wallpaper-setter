@@ -40,9 +40,12 @@ Build a wallpaper setter app with premium UI/UX: fast browsing, delightful previ
 - Co-locate component, styles, and tests when it improves maintainability.
 - Extract reusable UI primitives early (buttons, cards, modals, grid items).
 - Avoid duplicate utility modules with overlapping purposes.
+- **The UI is Electron** (`electron/`). The Swift code is only the CLI sidecar (`Sources/WallpaperSetterCLI`) and core library (`Sources/WallpaperSetterCore`). There is no Swift UI. Do not create or modify Swift UI code.
+- When migrating or replacing a module, **delete the old code, tests, and scripts immediately**. Never leave dead code behind.
 
 ## Workflow Rules
 - Start with a short plan for non-trivial changes before editing.
+- **Commit incrementally.** Each logical change (feature, fix, cleanup) gets its own commit. Do not batch unrelated changes into one commit.
 - Always delegate substantial work to parallel sub-agents instead of doing it only in the primary agent context.
 - Break every non-trivial request into small, manageable steps before execution.
 - Implement vertical slices where possible (UI + behavior + basic validation together).
