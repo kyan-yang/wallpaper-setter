@@ -19,6 +19,12 @@ npm run dev
 Local macOS packaging:
 
 ```bash
+npm run release:local
+```
+
+Equivalent manual steps:
+
+```bash
 ./scripts/build-app.sh
 ./scripts/package-dmg.sh
 ```
