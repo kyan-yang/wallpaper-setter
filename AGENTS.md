@@ -40,7 +40,7 @@ Build a wallpaper setter app with premium UI/UX: fast browsing, delightful previ
 - Co-locate component, styles, and tests when it improves maintainability.
 - Extract reusable UI primitives early (buttons, cards, modals, grid items).
 - Avoid duplicate utility modules with overlapping purposes.
-- **The UI is Electron** (`electron/`). The Swift code is only the CLI sidecar (`Sources/WallpaperSetterCLI`) and core library (`Sources/WallpaperSetterCore`). There is no Swift UI. Do not create or modify Swift UI code.
+- **The entire app is Electron** (`electron/`). There is no Swift code. Wallpaper apply uses `osascript`, persistence is JSON via Node.js, goals rendering uses Canvas in the renderer process.
 - When migrating or replacing a module, **delete the old code, tests, and scripts immediately**. Never leave dead code behind.
 
 ## Workflow Rules
