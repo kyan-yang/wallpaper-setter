@@ -32,12 +32,6 @@
     },
     "files": [
       "dist/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "../.build/release/WallpaperSetterCLI",
-        "to": "sidecar/WallpaperSetterCLI"
-      }
     ]
   }
 }

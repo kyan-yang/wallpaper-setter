@@ -1,11 +1,13 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, protocol, net } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, screen } from 'electron';
 import path from 'path';
-import { Sidecar } from './sidecar';
+import fs from 'fs';
+import * as persistence from './persistence';
+import { applyWallpaper, getScreenSize } from './wallpaper';
+import { randomUUID } from 'crypto';
 
 const isDev = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
-let sidecar: Sidecar;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -40,14 +42,8 @@ function createWindow() {
   });
 }
 
-function getSidecarPath(): string {
-  if (process.env.SIDECAR_PATH) {
-    return process.env.SIDECAR_PATH;
-  }
-  if (isDev) {
-    return path.resolve(__dirname, '..', '..', '..', '.build', 'debug', 'WallpaperSetterCLI');
-  }
-  return path.join(process.resourcesPath!, 'sidecar', 'WallpaperSetterCLI');
+function generatedDir(): string {
+  return path.join(app.getPath('userData'), 'Generated');
 }
 
 app.whenReady().then(() => {
@@ -56,7 +52,6 @@ app.whenReady().then(() => {
     return net.fetch(`file://${filePath}`);
   });
 
-  sidecar = new Sidecar(getSidecarPath());
   registerIPC();
   createWindow();
 });
@@ -66,32 +61,82 @@ app.on('window-all-closed', () => {
 });
 
 function registerIPC() {
-  ipcMain.handle('sidecar:bootstrap', async () => {
-    return sidecar.run('bootstrap');
+  ipcMain.handle('app:bootstrap', async () => {
+    try {
+      return persistence.bootstrap();
+    } catch (error: any) {
+      return { error: true, code: 'persistence_failed', message: error.message, suggestion: '' };
+    }
   });
 
-  ipcMain.handle('sidecar:apply', async (_event, filePath: string) => {
-    return sidecar.run('apply', [filePath]);
+  ipcMain.handle('app:apply', async (_event, filePath: string) => {
+    try {
+      applyWallpaper(filePath);
+
+      const entry = {
+        id: randomUUID(),
+        fileURL: filePath,
+        createdAt: new Date().toISOString(),
+        source: 'localImage',
+        metadata: {},
+      };
+      persistence.addHistoryEntry(entry);
+      persistence.saveLastApplied(filePath);
+
+      return { success: true, message: 'Wallpaper applied.', entry };
+    } catch (error: any) {
+      return { error: true, code: 'apply_failed', message: error.message, suggestion: 'Try another image or retry.' };
+    }
   });
 
-  ipcMain.handle('sidecar:generate-goals', async (_event, json: string) => {
-    return sidecar.run('generate-goals', [json]);
+  ipcMain.handle('app:save-rendered-image', async (_event, imageData: Uint8Array) => {
+    try {
+      const dir = generatedDir();
+      fs.mkdirSync(dir, { recursive: true });
+
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const filename = `goals-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.png`;
+      const filePath = path.join(dir, filename);
+
+      fs.writeFileSync(filePath, Buffer.from(imageData));
+
+      const { width, height } = getScreenSize();
+      return { success: true, fileURL: filePath, width, height };
+    } catch (error: any) {
+      return { error: true, code: 'render_failed', message: error.message, suggestion: 'Try again.' };
+    }
   });
 
-  ipcMain.handle('sidecar:save-draft', async (_event, json: string) => {
-    return sidecar.run('save-draft', [json]);
+  ipcMain.handle('app:save-draft', async (_event, json: string) => {
+    try {
+      persistence.saveGoalsDraft(JSON.parse(json));
+      return { success: true };
+    } catch (error: any) {
+      return { error: true, code: 'persistence_failed', message: error.message, suggestion: '' };
+    }
   });
 
-  ipcMain.handle('sidecar:delete-history', async (_event, id: string) => {
-    return sidecar.run('delete-history', [id]);
+  ipcMain.handle('app:delete-history', async (_event, id: string) => {
+    try {
+      persistence.deleteHistoryEntry(id);
+      return { success: true };
+    } catch (error: any) {
+      return { error: true, code: 'persistence_failed', message: error.message, suggestion: '' };
+    }
   });
 
-  ipcMain.handle('sidecar:clear-history', async () => {
-    return sidecar.run('clear-history');
+  ipcMain.handle('app:clear-history', async () => {
+    try {
+      persistence.clearHistory();
+      return { success: true };
+    } catch (error: any) {
+      return { error: true, code: 'persistence_failed', message: error.message, suggestion: '' };
+    }
   });
 
-  ipcMain.handle('sidecar:screen-info', async () => {
-    return sidecar.run('screen-info');
+  ipcMain.handle('app:screen-info', async () => {
+    return getScreenSize();
   });
 
   ipcMain.handle('dialog:open-file', async () => {

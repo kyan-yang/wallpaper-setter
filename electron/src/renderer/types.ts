@@ -36,7 +36,7 @@ export interface ScreenInfo {
   height: number;
 }
 
-export interface SidecarError {
+export interface AppError {
   error: true;
   code: string;
   message: string;
@@ -48,13 +48,13 @@ export type Tab = 'library' | 'goals';
 declare global {
   interface Window {
     api: {
-      bootstrap: () => Promise<BootstrapData | SidecarError>;
-      apply: (filePath: string) => Promise<ApplyResult | SidecarError>;
-      generateGoals: (json: string) => Promise<GenerateResult | SidecarError>;
-      saveDraft: (json: string) => Promise<{ success: boolean } | SidecarError>;
-      deleteHistory: (id: string) => Promise<{ success: boolean } | SidecarError>;
-      clearHistory: () => Promise<{ success: boolean } | SidecarError>;
-      screenInfo: () => Promise<ScreenInfo | SidecarError>;
+      bootstrap: () => Promise<BootstrapData | AppError>;
+      apply: (filePath: string) => Promise<ApplyResult | AppError>;
+      saveRenderedImage: (imageData: Uint8Array) => Promise<GenerateResult | AppError>;
+      saveDraft: (json: string) => Promise<{ success: boolean } | AppError>;
+      deleteHistory: (id: string) => Promise<{ success: boolean } | AppError>;
+      clearHistory: () => Promise<{ success: boolean } | AppError>;
+      screenInfo: () => Promise<ScreenInfo>;
       openFile: () => Promise<string | null>;
       showInFinder: (filePath: string) => Promise<void>;
     };

@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { Tab, HistoryEntry, GoalsDraft, SidecarError } from './types';
+import type { Tab, HistoryEntry, GoalsDraft, AppError } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Library } from './components/Library';
 import { Preview } from './components/Preview';
 import { GoalsEditor } from './components/GoalsEditor';
 import { Toast } from './components/Toast';
+import { renderGoals } from './lib/render-goals';
 
-function isError(result: any): result is SidecarError {
+function isError(result: any): result is AppError {
   return result && result.error === true;
 }
 
@@ -83,13 +84,18 @@ export function App() {
     if (isBusy) return;
     setIsBusy(true);
     try {
-      const result = await window.api.generateGoals(JSON.stringify(draft));
+      const screenInfo = await window.api.screenInfo();
+      const imageData = await renderGoals(draft, screenInfo.width, screenInfo.height);
+      const result = await window.api.saveRenderedImage(imageData);
       if (isError(result)) {
         showToast(result.message, 'error');
         return;
       }
+      await window.api.saveDraft(JSON.stringify(draft));
       setPreviewPath(result.fileURL);
       setSelectedPath(result.fileURL);
+    } catch (error: any) {
+      showToast(error.message || 'Failed to generate goals', 'error');
     } finally {
       setIsBusy(false);
     }
