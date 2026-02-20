@@ -4,7 +4,7 @@ import AppKit
 
 final class WallpaperStateStoreTests: XCTestCase {
     @MainActor
-    func testApplySelectedImageSuccessAddsHistoryAndPersistsLastApplied() throws {
+    func testApplySelectedImageSuccessAddsHistoryAndPersistsLastApplied() async throws {
         let adapter = MockWallpaperAdapter()
         let renderer = MockGoalsRenderer()
         let persistence = InMemoryWallpaperPersistence()
@@ -18,7 +18,7 @@ final class WallpaperStateStoreTests: XCTestCase {
 
         let url = URL(fileURLWithPath: "/tmp/wallpaper.png")
         store.selectImage(url: url)
-        store.applySelectedImage()
+        await store.applySelectedImageAsync()
 
         XCTAssertEqual(store.lastAppliedURL, url)
         XCTAssertEqual(store.history.count, 1)
@@ -27,7 +27,7 @@ final class WallpaperStateStoreTests: XCTestCase {
     }
 
     @MainActor
-    func testApplySelectedImageFailureSetsError() throws {
+    func testApplySelectedImageFailureSetsError() async throws {
         let adapter = MockWallpaperAdapter()
         adapter.shouldFailApply = true
         let renderer = MockGoalsRenderer()
@@ -41,7 +41,7 @@ final class WallpaperStateStoreTests: XCTestCase {
 
         let url = URL(fileURLWithPath: "/tmp/wallpaper.png")
         store.selectImage(url: url)
-        store.applySelectedImage()
+        await store.applySelectedImageAsync()
 
         XCTAssertNotNil(store.lastError)
         if case .failure = store.applyStatus {
@@ -52,7 +52,7 @@ final class WallpaperStateStoreTests: XCTestCase {
     }
 
     @MainActor
-    func testGenerateGoalsWallpaperUpdatesSelection() throws {
+    func testGenerateGoalsWallpaperUpdatesSelection() async throws {
         let adapter = MockWallpaperAdapter()
         let renderer = MockGoalsRenderer()
         let persistence = InMemoryWallpaperPersistence()
@@ -64,7 +64,7 @@ final class WallpaperStateStoreTests: XCTestCase {
         )
         store.goalsDraft = GoalsDraft(title: "Focus", goalsText: "Ship MVP", theme: .minimalDark)
 
-        store.generateAndSelectGoalsWallpaper()
+        await store.generateAndSelectGoalsWallpaperAsync()
 
         XCTAssertNotNil(store.selectedImageURL)
         XCTAssertEqual(store.goalsDraft, persistence.draft)

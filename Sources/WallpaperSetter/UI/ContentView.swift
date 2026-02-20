@@ -209,6 +209,7 @@ struct ContentView: View {
             HStack {
                 Button("Generate Preview") { store.generateAndSelectGoalsWallpaper() }
                     .keyboardShortcut("g", modifiers: [.command])
+                    .disabled(store.isBusy)
                 Spacer()
             }
 
