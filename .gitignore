@@ -1,4 +1,8 @@
 .build/
 .swiftpm/
+.derived/
+dist/
+*.profraw
+default.profraw
 .DS_Store
 .vscode/

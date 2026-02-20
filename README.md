@@ -12,8 +12,40 @@ Local-first macOS wallpaper app with fast preview, safe apply, and goals wallpap
 ```bash
 swift build
 swift run WallpaperSetter
+./scripts/run-app.sh
 swift test
 ```
+
+## Build Downloadable App
+
+Build a local macOS app bundle and DMG:
+
+```bash
+./scripts/build-app.sh
+./scripts/package-dmg.sh
+```
+
+One-step release (build + package + optionally open DMG):
+
+```bash
+VERSION=0.2.0 ./scripts/release-local.sh
+```
+
+Use `OPEN_DMG=0` to skip auto-opening the DMG after packaging.
+
+Cleanup generated artifacts:
+
+```bash
+./scripts/clean-artifacts.sh
+```
+
+Use `KEEP_DIST=0 ./scripts/clean-artifacts.sh` to also remove `dist/`.
+
+Outputs:
+- `dist/WallpaperSetter.app`
+- `dist/WallpaperSetter-0.1.0.dmg` (or `WallpaperSetter-$VERSION.dmg` if `VERSION` is set)
+
+For CI release packaging, see `.github/README-release-secrets.md`.
 
 ## Architecture
 
