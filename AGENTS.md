@@ -65,3 +65,15 @@ Build a wallpaper setter app with premium UI/UX: fast browsing, delightful previ
 - If a decision improves UX consistency and implementation complexity is reasonable, choose consistency.
 - If architecture choices conflict, pick the option that keeps UI iteration fastest.
 - If uncertain, ship a minimal stable path first, then iterate with measured polish.
+
+## Debugging & Fixing Discipline
+- Start from symptoms, not assumptions. Reproduce the exact user-visible failure first and capture the real command/output that fails.
+- Validate each critical assumption with a direct check before coding (file format, process behavior, API scope, permissions, runtime environment).
+- Prefer narrow experiments over large rewrites. Prove or falsify one hypothesis at a time.
+- Treat “it should work” as untrusted until observed in this environment.
+- Design fixes around the real failure mode, not a generic abstraction. Keep the first successful fix minimal and explicit.
+- Fail loudly with context. Bubble up original stderr/stdout details so users and future agents can diagnose quickly.
+- Add a test seam before deep fixes when possible (dependency injection or pure transform helpers). This allows deterministic regression tests.
+- Validate fixes twice: automated checks (tests/build) and realistic manual behavior checks for the user flow.
+- If the first fix fails, do a short postmortem before the next attempt: what assumption was wrong, what evidence was missing, what to test next.
+- Record durable learnings in `AGENTS.md` immediately after resolution so future agents avoid repeating dead ends.
