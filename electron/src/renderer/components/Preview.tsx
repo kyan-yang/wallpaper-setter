@@ -27,7 +27,7 @@ export function Preview({ filePath, isBusy, isApplied, onApply, onDismiss }: Pre
         overflow: 'hidden',
       }}>
         <img
-          src={`file://${filePath}`}
+          src={`local-file://${filePath}`}
           alt={fileName}
           style={{
             maxWidth: '100%',
@@ -87,7 +87,7 @@ export function Preview({ filePath, isBusy, isApplied, onApply, onDismiss }: Pre
           onMouseEnter={(e) => { if (!isBusy) e.currentTarget.style.background = 'var(--accent-hover)'; }}
           onMouseLeave={(e) => { if (!isBusy) e.currentTarget.style.background = 'var(--accent)'; }}
         >
-          {isBusy ? '⟳ Applying…' : '⌘ Apply'}
+          {isBusy ? '⟳ Applying…' : 'Apply'}
         </button>
 
         {isApplied && (

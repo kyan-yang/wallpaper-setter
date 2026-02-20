@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol, net } from 'electron';
 import path from 'path';
 import { Sidecar } from './sidecar';
 
@@ -15,7 +15,7 @@ function createWindow() {
     minHeight: 620,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 18 },
-    backgroundColor: '#0F0F11',
+    backgroundColor: '#F5EDE0',
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'index.js'),
@@ -51,6 +51,11 @@ function getSidecarPath(): string {
 }
 
 app.whenReady().then(() => {
+  protocol.handle('local-file', (request) => {
+    const filePath = decodeURIComponent(request.url.replace('local-file://', ''));
+    return net.fetch(`file://${filePath}`);
+  });
+
   sidecar = new Sidecar(getSidecarPath());
   registerIPC();
   createWindow();

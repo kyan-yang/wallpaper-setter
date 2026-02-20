@@ -158,7 +158,7 @@ function WallpaperCard({ entry, isActive, onSelect, onDelete }: {
     >
       {!imgError ? (
         <img
-          src={`file://${entry.fileURL}`}
+          src={`local-file://${entry.fileURL}`}
           alt={fileName}
           onError={() => setImgError(true)}
           style={{

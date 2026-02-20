@@ -1,35 +1,35 @@
 :root {
   /* Background */
-  --bg: #0F0F11;
-  --bg-surface: rgba(255, 255, 255, 0.04);
-  --bg-surface-hover: rgba(255, 255, 255, 0.07);
-  --bg-surface-active: rgba(255, 255, 255, 0.10);
-  --bg-elevated: #1A1A1E;
-  --bg-inset: #0A0A0C;
+  --bg: #F5EDE0;
+  --bg-surface: rgba(90, 70, 45, 0.06);
+  --bg-surface-hover: rgba(90, 70, 45, 0.10);
+  --bg-surface-active: rgba(90, 70, 45, 0.14);
+  --bg-elevated: #FAF4EA;
+  --bg-inset: #EDE4D3;
 
   /* Border */
-  --border: rgba(255, 255, 255, 0.06);
-  --border-hover: rgba(255, 255, 255, 0.10);
-  --border-focus: rgba(99, 115, 245, 0.5);
+  --border: rgba(90, 70, 45, 0.12);
+  --border-hover: rgba(90, 70, 45, 0.20);
+  --border-focus: rgba(142, 100, 54, 0.50);
 
   /* Text */
-  --text-primary: rgba(255, 255, 255, 0.92);
-  --text-secondary: rgba(255, 255, 255, 0.55);
-  --text-tertiary: rgba(255, 255, 255, 0.32);
-  --text-accent: #8B9CF7;
+  --text-primary: rgba(42, 32, 18, 0.92);
+  --text-secondary: rgba(42, 32, 18, 0.58);
+  --text-tertiary: rgba(42, 32, 18, 0.36);
+  --text-accent: #7A5C30;
 
   /* Accent */
-  --accent: #5B6EF5;
-  --accent-hover: #4F62E8;
-  --accent-subtle: rgba(91, 110, 245, 0.10);
+  --accent: #8E6436;
+  --accent-hover: #7A5529;
+  --accent-subtle: rgba(142, 100, 54, 0.10);
   --accent-text: #FFFFFF;
 
   /* Semantic */
-  --success: #22C55E;
-  --success-subtle: rgba(34, 197, 94, 0.10);
-  --warning: #F59E0B;
-  --destructive: #EF4444;
-  --destructive-subtle: rgba(239, 68, 68, 0.10);
+  --success: #5A7A3A;
+  --success-subtle: rgba(90, 122, 58, 0.10);
+  --warning: #C48820;
+  --destructive: #B94A3A;
+  --destructive-subtle: rgba(185, 74, 58, 0.10);
 
   /* Radius */
   --radius-xs: 4px;
@@ -60,9 +60,9 @@
   --leading-normal: 1.5;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 2px rgba(90, 70, 45, 0.08);
+  --shadow-md: 0 4px 12px rgba(90, 70, 45, 0.12);
+  --shadow-lg: 0 8px 24px rgba(90, 70, 45, 0.16);
 
   /* Transitions */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);

@@ -45,7 +45,7 @@ export function GoalsEditor({ draft, previewPath, isBusy, onDraftChange, onGener
       }}>
         {previewPath ? (
           <img
-            src={`file://${previewPath}?t=${Date.now()}`}
+            src={`local-file://${previewPath}?t=${Date.now()}`}
             alt="Goals preview"
             style={{
               maxWidth: '100%',
