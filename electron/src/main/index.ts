@@ -9,6 +9,14 @@ const isDev = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
 
+function applyFailureSuggestion(message: string): string {
+  if (/not authorized to send apple events to system events/i.test(message) || /-1743/.test(message)) {
+    return 'Allow Automation for System Events in System Settings > Privacy & Security > Automation, then retry.';
+  }
+
+  return 'Try another image or retry.';
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1100,
@@ -85,7 +93,12 @@ function registerIPC() {
 
       return { success: true, message: 'Wallpaper applied.', entry };
     } catch (error: any) {
-      return { error: true, code: 'apply_failed', message: error.message, suggestion: 'Try another image or retry.' };
+      return {
+        error: true,
+        code: 'apply_failed',
+        message: error.message,
+        suggestion: applyFailureSuggestion(error.message ?? ''),
+      };
     }
   });
 
