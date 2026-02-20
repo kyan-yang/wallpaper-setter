@@ -77,3 +77,12 @@ Build a wallpaper setter app with premium UI/UX: fast browsing, delightful previ
 - Validate fixes twice: automated checks (tests/build) and realistic manual behavior checks for the user flow.
 - If the first fix fails, do a short postmortem before the next attempt: what assumption was wrong, what evidence was missing, what to test next.
 - Record durable learnings in `AGENTS.md` immediately after resolution so future agents avoid repeating dead ends.
+
+## Root-Cause Prevention
+- Primary failure pattern to avoid: assumption-driven fixes. If behavior depends on OS internals, verify with runtime evidence before implementation.
+- Never infer scope from API names alone (for example, display-level vs space-level behavior). Confirm actual scope in a live environment.
+- Before merging adapter changes, run a minimum validation matrix that matches real usage: single desktop, multiple Spaces, multiple displays, and denied permissions.
+- Use representative system artifacts in tests whenever possible. Synthetic fixtures alone are not enough for platform integration code.
+- Guard risky integration steps with explicit preflight checks (format compatibility, file existence, command availability) and actionable errors.
+- Prefer incremental rollout inside the adapter: add one mechanism, verify, then add the next. Do not stack unverified fixes.
+- When a fix fails in production-like use, require a brief written postmortem in the PR/commit notes before attempting the next fix.
