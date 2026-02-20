@@ -7,7 +7,6 @@ let package = Package(
         .macOS(.v13),
     ],
     products: [
-        .executable(name: "WallpaperSetter", targets: ["WallpaperSetter"]),
         .executable(name: "WallpaperSetterCLI", targets: ["WallpaperSetterCLI"]),
         .library(name: "WallpaperSetterCore", targets: ["WallpaperSetterCore"]),
     ],
@@ -17,18 +16,13 @@ let package = Package(
             path: "Sources/WallpaperSetterCore"
         ),
         .executableTarget(
-            name: "WallpaperSetter",
-            dependencies: ["WallpaperSetterCore"],
-            path: "Sources/WallpaperSetter"
-        ),
-        .executableTarget(
             name: "WallpaperSetterCLI",
             dependencies: ["WallpaperSetterCore"],
             path: "Sources/WallpaperSetterCLI"
         ),
         .testTarget(
             name: "WallpaperSetterTests",
-            dependencies: ["WallpaperSetter", "WallpaperSetterCore"],
+            dependencies: ["WallpaperSetterCore"],
             path: "Tests/WallpaperSetterTests"
         ),
     ]
