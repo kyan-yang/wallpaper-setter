@@ -44,7 +44,7 @@ The app does one job: set the Mac background from the user's own images. Browse 
 - Avoid duplicate utility modules with overlapping purposes.
 - **The entire app is Electron** (`electron/`). Persistence is `prefs.json` via Node.js; thumbnails are cached `sips` conversions served through the `wp://` protocol.
 - Wallpaper apply writes WallpaperAgent's store (`~/Library/Application Support/com.apple.wallpaper/Store/Index.plist`) in its all-Spaces form through JXA and `NSPropertyListSerialization`, restarts WallpaperAgent, then verifies with `NSWorkspace`. `NSWorkspace.setDesktopImageURL` alone changes only the current Space and switches "Show on all Spaces" back off, so it must not be used to set.
-- When replacing anything, **remove every trace of what it replaced**: code, tests, scripts, docs, comments, config entries, version numbers that imply a predecessor, and data the old version left on the machine. Nothing in the repo or on disk should reveal that an earlier version existed.
+- When replacing anything, **remove every trace of what it replaced**: code, tests, scripts, docs, comments, config entries, version numbers that imply a predecessor, and data the old version left on the machine. Nothing in the working tree or on disk should reveal that an earlier version existed. Git history stays as it is.
 
 ## Workflow Rules
 - Start with a short plan for non-trivial changes before editing.
