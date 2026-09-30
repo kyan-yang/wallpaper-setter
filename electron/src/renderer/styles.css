@@ -1,0 +1,976 @@
+/* Tokens. --accent, --accent-fill, --on-accent and --screen-aspect are set at
+   runtime from boot(); the values here only cover the screens before boot. */
+:root {
+  --accent: #007aff;
+  --accent-fill: var(--accent);
+  --on-accent: #ffffff;
+  --screen-aspect: 1.6;
+
+  --main-bg: #ffffff;
+  --text: rgb(0 0 0 / 0.85);
+  --text-2: rgb(0 0 0 / 0.6);
+  --separator: rgb(0 0 0 / 0.1);
+  --fill-hover: rgb(0 0 0 / 0.05);
+  --fill-selected: rgb(0 0 0 / 0.08);
+  --control-bg: #ffffff;
+  --control-edge: rgb(0 0 0 / 0.16);
+  --skeleton: rgb(0 0 0 / 0.06);
+  --skeleton-shine: rgb(0 0 0 / 0.1);
+  --image-edge: rgb(0 0 0 / 0.1);
+  --danger: #c4001a;
+  --danger-bg: #fff2f2;
+  --danger-edge: rgb(215 0 21 / 0.22);
+  --desktop-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.12), 0 2px 4px rgb(0 0 0 / 0.06), 0 12px 32px rgb(0 0 0 / 0.14);
+
+  --sidebar-width: 240px;
+  --header-height: 52px;
+  --gutter: 24px;
+  --focus-halo: color-mix(in srgb, var(--accent) 32%, transparent);
+
+  color-scheme: light dark;
+}
+
+/* Dark values, shared by dark mode and the always-dark full preview. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --main-bg: #1e1e1e;
+    --text: rgb(255 255 255 / 0.88);
+    --text-2: rgb(255 255 255 / 0.6);
+    --separator: rgb(255 255 255 / 0.1);
+    --fill-hover: rgb(255 255 255 / 0.06);
+    --fill-selected: rgb(255 255 255 / 0.1);
+    --control-bg: rgb(255 255 255 / 0.13);
+    --control-edge: rgb(255 255 255 / 0.06);
+    --skeleton: rgb(255 255 255 / 0.07);
+    --skeleton-shine: rgb(255 255 255 / 0.12);
+    --image-edge: rgb(255 255 255 / 0.1);
+    --danger: #ff6961;
+    --danger-bg: rgb(255 69 58 / 0.14);
+    --danger-edge: rgb(255 69 58 / 0.3);
+    --desktop-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.1), 0 12px 32px rgb(0 0 0 / 0.5);
+  }
+}
+
+/* Base */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Transparent so the window's sidebar vibrancy shows through. */
+html,
+body {
+  background: transparent;
+}
+
+body {
+  font: 13px/1.38 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+  overflow: hidden;
+}
+
+h1,
+p {
+  margin: 0;
+  font: inherit;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+
+img {
+  -webkit-user-drag: none;
+}
+
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.drag {
+  -webkit-app-region: drag;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Motion: only for state changes */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+@keyframes zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+.pop {
+  animation: pop-in 180ms cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--skeleton) 35%, var(--skeleton-shine) 50%, var(--skeleton) 65%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .spin {
+    animation: spin 1.6s linear infinite !important;
+  }
+}
+
+/* Layout */
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  height: 100vh;
+}
+
+/* Sidebar: transparent over the window's vibrancy */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sidebar-top {
+  flex: none;
+  height: var(--header-height);
+}
+
+.tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 10px 10px;
+}
+
+.tree-row,
+.tree-status {
+  padding-left: calc(4px + (var(--level) - 1) * 14px);
+}
+
+.tree-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding-right: 6px;
+  border-radius: 6px;
+  scroll-margin: 6px;
+}
+
+.tree-row[aria-selected='true'] {
+  background: var(--fill-selected);
+}
+
+.tree-row:focus-visible {
+  outline-offset: -2px;
+}
+
+.tree-row.is-first-extra {
+  margin-top: 13px;
+}
+
+.tree-row.is-first-extra::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  background: var(--separator);
+}
+
+.tree-chevron {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--text-2);
+  transition: transform 140ms ease-out;
+}
+
+.tree-chevron.is-open {
+  transform: rotate(90deg);
+}
+
+.tree-chevron.is-leaf {
+  visibility: hidden;
+}
+
+.tree-icon {
+  flex: none;
+  color: var(--text-2);
+}
+
+.tree-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-count {
+  flex: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+.tree-count.is-error {
+  display: grid;
+  color: var(--danger);
+}
+
+.tree-remove {
+  flex: none;
+  display: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-2);
+}
+
+.tree-remove:hover {
+  background: var(--fill-hover);
+  color: var(--text);
+}
+
+.tree-row.is-removable:hover .tree-remove,
+.tree-row.is-removable:focus-within .tree-remove {
+  display: grid;
+}
+
+.tree-row.is-removable:hover .tree-count,
+.tree-row.is-removable:focus-within .tree-count {
+  display: none;
+}
+
+.tree-status {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-right: 6px;
+  margin-left: 21px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* Only show "Loading…" if loading takes long enough to notice. */
+.tree-status.is-loading {
+  animation: fade-in 200ms 300ms both;
+}
+
+.tree-status.is-error {
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+
+.sidebar-footer {
+  flex: none;
+  padding: 6px 10px 10px;
+  border-top: 1px solid var(--separator);
+}
+
+.sidebar-add {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-2);
+  text-align: left;
+}
+
+.sidebar-add:hover {
+  background: var(--fill-hover);
+  color: var(--text);
+}
+
+/* Main pane: solid, so the images carry the color */
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--main-bg);
+  border-left: 1px solid var(--separator);
+}
+
+.main-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--header-height);
+  padding: 0 var(--gutter);
+}
+
+.main-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.main-count {
+  flex: none;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The preview takes whatever height is left after two rows of tiles, capped so a
+   huge window still leaves room to browse, and never wider than the pane. */
+.main-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  container-type: size;
+  --preview-h: clamp(220px, calc(100cqh - 400px), 64cqh);
+  --preview-w: min(calc(100cqw - 2 * var(--gutter)), calc(var(--preview-h) * var(--screen-aspect)));
+}
+
+.stage {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px var(--gutter) 0;
+}
+
+.stage-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: max(360px, var(--preview-w));
+  max-width: 100%;
+}
+
+.stage-column > .desktop {
+  width: var(--preview-w);
+  align-self: center;
+}
+
+.hint {
+  max-width: 100%;
+  margin: 10px 0 12px;
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Desktop miniature */
+.desktop {
+  position: relative;
+  flex: none;
+  aspect-ratio: var(--screen-aspect);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--skeleton);
+  box-shadow: var(--desktop-shadow);
+  container-type: inline-size;
+  isolation: isolate;
+}
+
+.desktop-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.desktop-img.is-loaded {
+  opacity: 1;
+}
+
+.desktop-menubar {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: max(6px, 2.3cqw);
+  padding: 0 1.6cqw;
+  background: rgb(255 255 255 / 0.18);
+  -webkit-backdrop-filter: blur(12px) saturate(1.6);
+  backdrop-filter: blur(12px) saturate(1.6);
+}
+
+.menubar-group {
+  display: flex;
+  align-items: center;
+  gap: 1.3cqw;
+}
+
+.menubar-group > span {
+  width: 2.6cqw;
+  height: 0.6cqw;
+  border-radius: 1cqw;
+  background: rgb(255 255 255 / 0.72);
+}
+
+.menubar-group:first-child > span:first-child {
+  width: 0.9cqw;
+  height: 0.9cqw;
+}
+
+.menubar-group:first-child > span:nth-child(2) {
+  width: 3.2cqw;
+}
+
+.menubar-group:last-child > span:last-child {
+  width: 4.4cqw;
+}
+
+.desktop-dock {
+  position: absolute;
+  left: 50%;
+  bottom: 1.1cqw;
+  z-index: 2;
+  width: 42cqw;
+  height: 4.4cqw;
+  border-radius: 1.5cqw;
+  transform: translateX(-50%);
+  background: rgb(255 255 255 / 0.22);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  backdrop-filter: blur(14px) saturate(1.6);
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.4), 0 0.3cqw 1cqw rgb(0 0 0 / 0.12);
+}
+
+.desktop-message {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--main-bg);
+}
+
+/* Actions under the preview */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+}
+
+.btn:not(:disabled):active {
+  filter: brightness(0.92);
+}
+
+.btn-primary {
+  min-width: 156px;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  box-shadow: 0 1px 1.5px rgb(0 0 0 / 0.14), inset 0 0.5px 0 rgb(255 255 255 / 0.22);
+}
+
+.btn-secondary {
+  background: var(--control-bg);
+  color: var(--text);
+  box-shadow: 0 0 0 0.5px var(--control-edge), 0 1px 1.5px rgb(0 0 0 / 0.07);
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.file-name {
+  min-width: 0;
+  padding: 3px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-name:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px 0 6px;
+  border-radius: 10px;
+  background: var(--fill-selected);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 500;
+  animation: pop-in 180ms ease-out;
+}
+
+/* Errors: persistent until dismissed or replaced */
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 6px 7px 10px;
+  border-radius: 8px;
+  background: var(--danger-bg);
+  box-shadow: inset 0 0 0 1px var(--danger-edge);
+  font-size: 12px;
+  line-height: 1.45;
+  animation: fade-in 150ms ease-out;
+}
+
+.banner-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--danger);
+}
+
+.banner-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.banner-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-2);
+}
+
+.banner-close:hover {
+  background: var(--fill-hover);
+  color: var(--text);
+}
+
+/* Image grid: the only part that scrolls */
+.grid-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px var(--gutter) var(--gutter);
+  border-top: 1px solid var(--separator);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px 14px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  scroll-margin: 14px;
+}
+
+.tile:focus-visible {
+  outline: none;
+}
+
+.tile-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 3 / 2;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: var(--skeleton);
+  box-shadow: 0 0 0 0.5px var(--image-edge);
+}
+
+.tile-frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tile[aria-selected='true'] .tile-frame {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tile:focus-visible .tile-frame {
+  box-shadow: 0 0 0 0.5px var(--image-edge), 0 0 0 7.5px var(--focus-halo);
+}
+
+.tile-broken {
+  color: var(--text-2);
+}
+
+.tile-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 7px 0 5px;
+  border-radius: 9px;
+  background: rgb(0 0 0 / 0.58);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 600;
+  animation: pop-in 180ms ease-out;
+}
+
+.tile-name {
+  padding: 0 4px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile[aria-selected='true'] .tile-name {
+  color: var(--text);
+}
+
+.tile-name-skeleton {
+  align-self: center;
+  width: 60%;
+  height: 10px;
+  margin: 3px 0;
+  border-radius: 5px;
+}
+
+.grid-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 100%;
+  padding: 16px;
+  text-align: center;
+  color: var(--text-2);
+}
+
+.grid-state-icon {
+  margin-bottom: 6px;
+}
+
+.grid-state-icon.is-error {
+  color: var(--danger);
+}
+
+.grid-state-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.grid-state-text {
+  max-width: 420px;
+  overflow-wrap: anywhere;
+}
+
+.grid-state .btn {
+  margin-top: 10px;
+}
+
+/* Full preview: always dark, whatever the system appearance */
+.overlay {
+  --main-bg: #1e1e1e;
+  --text: rgb(255 255 255 / 0.92);
+  --text-2: rgb(255 255 255 / 0.62);
+  --fill-hover: rgb(255 255 255 / 0.1);
+  --fill-selected: rgb(255 255 255 / 0.14);
+  --skeleton: rgb(255 255 255 / 0.07);
+  --danger: #ff6961;
+  --danger-bg: rgb(255 69 58 / 0.16);
+  --danger-edge: rgb(255 69 58 / 0.32);
+  --desktop-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.12), 0 20px 60px rgb(0 0 0 / 0.6);
+
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 40px 20px;
+  background: rgb(0 0 0 / 0.86);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  color: var(--text);
+  color-scheme: dark;
+  -webkit-app-region: no-drag;
+  animation: fade-in 150ms ease-out;
+}
+
+.overlay:focus-visible {
+  outline: none;
+}
+
+.overlay-stage {
+  flex: 1;
+  min-height: 0;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.overlay-stage > .desktop {
+  width: min(100cqw, calc(100cqh * var(--screen-aspect)));
+  animation: zoom-in 180ms ease-out;
+}
+
+.overlay-caption {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  min-height: 22px;
+  margin-top: 6px;
+}
+
+.overlay-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.overlay-status {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-2);
+}
+
+.overlay-hint {
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.overlay .banner {
+  width: min(560px, 100%);
+}
+
+.overlay-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.1);
+  color: var(--text);
+}
+
+.overlay-close:hover {
+  background: rgb(255 255 255 / 0.18);
+}
+
+/* Drag and drop */
+.drop-overlay {
+  position: fixed;
+  inset: 8px;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  pointer-events: none;
+  animation: fade-in 120ms ease-out;
+}
+
+.drop-label {
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--main-bg);
+  box-shadow: 0 0 0 0.5px var(--image-edge), 0 6px 20px rgb(0 0 0 / 0.16);
+  font-weight: 500;
+}
+
+/* Before boot resolves, and when it fails */
+.boot-waiting {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  animation: fade-in 200ms 400ms both;
+}
+
+.boot-failure {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  padding: 40px;
+  background: var(--main-bg);
+}
+
+.boot-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 440px;
+  text-align: center;
+  -webkit-app-region: no-drag;
+}
+
+.boot-icon {
+  margin-bottom: 4px;
+  color: var(--danger);
+}
+
+.boot-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.boot-message {
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.boot-card .btn {
+  margin-top: 10px;
+}
