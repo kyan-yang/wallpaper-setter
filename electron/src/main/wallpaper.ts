@@ -1,162 +1,160 @@
-import { execFileSync } from 'child_process';
-import { screen } from 'electron';
+import { execFile } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { pathToFileURL } from 'url';
+import { isImagePath } from '../shared/api';
 
-const SUPPORTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'heic', 'bmp', 'tiff', 'webp'];
-const WALLPAPER_SCRIPT_LINES = [
-  'on run argv',
-  'set targetFile to POSIX file (item 1 of argv)',
-  'tell application "System Events"',
-  'repeat with desktopRef in desktops',
-  'set picture of desktopRef to targetFile',
-  'end repeat',
-  'end tell',
-  'end run',
-] as const;
-const WALLPAPER_STORE_RELATIVE_PATH = ['Library', 'Application Support', 'com.apple.wallpaper', 'Store', 'Index.plist'] as const;
+// macOS has no public API that sets one wallpaper on every Space: NSWorkspace
+// only changes the current Space, and it turns "Show on all Spaces" back off.
+// So we write WallpaperAgent's store in its all-Spaces form (the same shape
+// System Settings writes when "Show on all Spaces" is on), restart the agent,
+// and confirm through NSWorkspace that every display now shows the image.
 
-type ExecSync = (command: string, args: string[], options: { timeout: number }) => unknown;
+export const WALLPAPER_STORE_PATH = path.join(
+  os.homedir(), 'Library', 'Application Support', 'com.apple.wallpaper', 'Store', 'Index.plist',
+);
 
-export interface WallpaperDependencies {
-  existsSync: (path: string) => boolean;
-  execSync: ExecSync;
-  readFileSync: (path: string, encoding: 'utf8') => string;
-  writeFileSync: (path: string, data: string) => void;
-  mkdtempSync: (prefix: string) => string;
-  rmSync: (path: string, options: { recursive: boolean; force: boolean }) => void;
-  homedir: () => string;
-  tmpdir: () => string;
+const READ_SCRIPT = `
+ObjC.import('AppKit');
+function run() {
+  const ws = $.NSWorkspace.sharedWorkspace;
+  const screens = $.NSScreen.screens;
+  const paths = [];
+  for (let i = 0; i < screens.count; i++) {
+    paths.push(ObjC.unwrap(ws.desktopImageURLForScreen(screens.objectAtIndex(i)).path));
+  }
+  return JSON.stringify(paths);
+}`;
+
+const WRITE_STORE_SCRIPT = `
+ObjC.import('AppKit');
+function encode(value) {
+  const err = Ref();
+  const data = $.NSPropertyListSerialization.dataWithPropertyListFormatOptionsError(value, $.NSPropertyListBinaryFormat_v1_0, 0, err);
+  if (data.isNil()) throw new Error('Could not encode the wallpaper settings: ' + ObjC.unwrap(err[0].localizedDescription));
+  return data;
 }
-
-const defaultDependencies: WallpaperDependencies = {
-  existsSync: (path) => fs.existsSync(path),
-  execSync: (command, args, options) => execFileSync(command, args, options),
-  readFileSync: (targetPath, encoding) => fs.readFileSync(targetPath, encoding),
-  writeFileSync: (targetPath, data) => fs.writeFileSync(targetPath, data),
-  mkdtempSync: (prefix) => fs.mkdtempSync(prefix),
-  rmSync: (targetPath, options) => fs.rmSync(targetPath, options),
-  homedir: () => os.homedir(),
-  tmpdir: () => os.tmpdir(),
-};
-
-export function buildWallpaperApplyCommand(filePath: string): { command: string; args: string[] } {
-  const scriptArgs = WALLPAPER_SCRIPT_LINES.flatMap((line) => ['-e', line]);
-  scriptArgs.push(filePath);
-  return { command: 'osascript', args: scriptArgs };
-}
-
-function extensionFor(path: string): string {
-  return path.split('.').pop()?.toLowerCase() ?? '';
-}
-
-function wallpaperStorePath(homeDir: string): string {
-  return path.join(homeDir, ...WALLPAPER_STORE_RELATIVE_PATH);
-}
-
-function fileURL(filePath: string): string {
-  return pathToFileURL(filePath).toString();
-}
-
-function xmlEscape(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;');
-}
-
-export function patchWallpaperStoreXml(rawStoreXml: string, targetFileURL: string): { rawStoreXml: string; updates: number } {
-  const escapedURL = xmlEscape(targetFileURL);
-  const relativeFileValuePattern = /(<key>\s*relative\s*<\/key>\s*<string>)[^<]*(<\/string>)/g;
-
-  let updates = 0;
-  const nextXml = rawStoreXml.replace(relativeFileValuePattern, (_match, prefix: string, suffix: string) => {
-    updates += 1;
-    return `${prefix}${escapedURL}${suffix}`;
+function run(argv) {
+  const storePath = argv[0];
+  const imagePath = argv[1];
+  const err = Ref();
+  const raw = $.NSData.dataWithContentsOfFile(storePath);
+  if (raw.isNil()) throw new Error('Could not read the macOS wallpaper settings at ' + storePath + '.');
+  const store = $.NSPropertyListSerialization.propertyListWithDataOptionsFormatError(raw, $.NSPropertyListMutableContainersAndLeaves, null, err);
+  if (store.isNil()) throw new Error('Could not parse the macOS wallpaper settings: ' + ObjC.unwrap(err[0].localizedDescription));
+  const keys = ObjC.deepUnwrap(store.allKeys).sort().join(', ');
+  const all = store.objectForKey('AllSpacesAndDisplays');
+  const systemDefault = store.objectForKey('SystemDefault');
+  const linked = [all, systemDefault].some(function (record) {
+    return !record.isNil() && (ObjC.unwrap(record.objectForKey('Type')) === 'linked' || !record.objectForKey('Linked').isNil());
   });
+  if (keys !== 'AllSpacesAndDisplays, Displays, Spaces, SystemDefault' || linked) {
+    throw new Error('This version of macOS stores wallpaper settings in a layout this app does not support (keys: ' + keys + ').');
+  }
+  const now = $.NSDate.date;
+  const configuration = encode($({
+    backgroundColor: { components: [0, 0, 0, 1], colorSpace: encode($('kCGColorSpaceGenericRGB')) },
+    placement: 1,
+  }));
+  const desktop = $({
+    Content: {
+      Choices: [{
+        Provider: 'com.apple.wallpaper.choice.image',
+        Files: [{ relative: ObjC.unwrap($.NSURL.fileURLWithPath(imagePath).absoluteString) }],
+        Configuration: configuration,
+      }],
+      Shuffle: '$null',
+    },
+    LastSet: now,
+    LastUse: now,
+  });
+  const nextAll = $.NSMutableDictionary.dictionary;
+  nextAll.setObjectForKey('individual', 'Type');
+  nextAll.setObjectForKey(desktop, 'Desktop');
+  const idle = all.objectForKey('Idle');
+  if (!idle.isNil()) nextAll.setObjectForKey(idle, 'Idle');
+  store.setObjectForKey(nextAll, 'AllSpacesAndDisplays');
+  systemDefault.setObjectForKey(desktop, 'Desktop');
+  store.setObjectForKey($.NSMutableDictionary.dictionary, 'Spaces');
+  store.setObjectForKey($.NSMutableDictionary.dictionary, 'Displays');
+  if (!encode(store).writeToFileAtomically(storePath, true)) {
+    throw new Error('Could not write the macOS wallpaper settings at ' + storePath + '.');
+  }
+  return 'ok';
+}`;
 
-  return { rawStoreXml: nextXml, updates };
-}
-
-function execErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    const candidate = error as Error & { stderr?: Buffer | string };
-    if (typeof candidate.stderr === 'string' && candidate.stderr.trim()) {
-      return candidate.stderr.trim();
-    }
-    if (Buffer.isBuffer(candidate.stderr)) {
-      const text = candidate.stderr.toString('utf8').trim();
-      if (text) {
-        return text;
+function exec(command: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(command, args, { timeout: 15000 }, (error, stdout, stderr) => {
+      if (error) {
+        reject(Object.assign(error, { stdout, stderr }));
+        return;
       }
-    }
-    return candidate.message;
-  }
-
-  return String(error);
+      resolve({ stdout, stderr });
+    });
+  });
 }
 
-function syncWallpaperStore(filePath: string, dependencies: WallpaperDependencies): void {
-  const storePath = wallpaperStorePath(dependencies.homedir());
-  if (!dependencies.existsSync(storePath)) {
-    return;
-  }
-
-  const tempDir = dependencies.mkdtempSync(path.join(dependencies.tmpdir(), 'wallpaper-store-'));
-  const xmlPath = path.join(tempDir, 'index.xml');
-
+// osascript reports a thrown JXA error on stderr as
+// "execution error: Error: <message> (-2700)".
+async function jxa(script: string, args: string[]): Promise<string> {
   try {
-    dependencies.execSync('plutil', ['-convert', 'xml1', '-o', xmlPath, storePath], { timeout: 10000 });
-    const rawStoreXml = dependencies.readFileSync(xmlPath, 'utf8');
-    const patchResult = patchWallpaperStoreXml(rawStoreXml, fileURL(filePath));
-    if (patchResult.updates === 0) {
-      throw new Error('No desktop wallpaper entries were found in macOS wallpaper store.');
-    }
-    dependencies.writeFileSync(xmlPath, patchResult.rawStoreXml);
-    dependencies.execSync('plutil', ['-convert', 'binary1', '-o', storePath, xmlPath], { timeout: 10000 });
-
-    try {
-      dependencies.execSync('killall', ['WallpaperAgent'], { timeout: 5000 });
-    } catch (error) {
-      const message = execErrorMessage(error);
-      if (!/No matching processes/i.test(message)) {
-        throw error;
-      }
-      dependencies.execSync('killall', ['Dock'], { timeout: 5000 });
-    }
-  } catch (error: unknown) {
-    throw new Error(`Failed to synchronize wallpaper across Spaces: ${execErrorMessage(error)}`);
-  } finally {
-    dependencies.rmSync(tempDir, { recursive: true, force: true });
+    const { stdout } = await exec('/usr/bin/osascript', ['-l', 'JavaScript', '-e', script, ...args]);
+    return stdout.trim();
+  } catch (error) {
+    const stderr = String((error as { stderr?: string }).stderr ?? '').trim();
+    const message = stderr.match(/execution error: (?:Error: )?(.*?)(?: \(-?\d+\))?$/s)?.[1];
+    throw new Error(message || stderr || (error as Error).message);
   }
 }
 
-export function applyWallpaper(filePath: string, dependencyOverrides: Partial<WallpaperDependencies> = {}): void {
-  const dependencies = { ...defaultDependencies, ...dependencyOverrides };
-  if (!dependencies.existsSync(filePath)) {
-    throw new Error(`File not found: ${filePath}`);
+export async function readWallpapers(): Promise<string[]> {
+  return JSON.parse(await jxa(READ_SCRIPT, [])) as string[];
+}
+
+export async function writeWallpaperStore(storePath: string, imagePath: string): Promise<void> {
+  const index2 = path.join(path.dirname(storePath), 'Index2.plist');
+  if (fs.existsSync(index2)) {
+    throw new Error(`This version of macOS keeps a second wallpaper store (${index2}) that this app does not support.`);
   }
+  await jxa(WRITE_STORE_SCRIPT, [storePath, imagePath]);
+}
 
-  const ext = extensionFor(filePath);
-  if (!SUPPORTED_EXTENSIONS.includes(ext)) {
-    throw new Error(`Unsupported format: ${ext}. Use: ${SUPPORTED_EXTENSIONS.join(', ')}`);
-  }
-
-  const { command, args } = buildWallpaperApplyCommand(filePath);
-
+async function restartWallpaperAgent(): Promise<void> {
   try {
-    dependencies.execSync(command, args, { timeout: 10000 });
-    syncWallpaperStore(filePath, dependencies);
-  } catch (error: unknown) {
-    throw new Error(`Failed to set wallpaper on every desktop: ${execErrorMessage(error)}`);
+    await exec('/usr/bin/killall', ['WallpaperAgent']);
+  } catch (error) {
+    const stderr = String((error as { stderr?: string }).stderr ?? '');
+    // Nothing to restart; launchd starts the agent on demand and the
+    // readback below still verifies the result.
+    if (!/No matching processes/i.test(stderr)) {
+      throw new Error(`Could not restart WallpaperAgent: ${stderr.trim() || (error as Error).message}`);
+    }
   }
 }
 
-export function getScreenSize(): { width: number; height: number } {
-  const display = screen.getPrimaryDisplay();
-  return { width: display.size.width, height: display.size.height };
+export async function assertApplicable(imagePath: string): Promise<void> {
+  let stat: fs.Stats;
+  try {
+    stat = await fs.promises.stat(imagePath);
+  } catch {
+    throw new Error(`${imagePath} no longer exists.`);
+  }
+  if (!stat.isFile()) throw new Error(`${imagePath} is not a file.`);
+  if (!isImagePath(imagePath)) throw new Error(`${path.basename(imagePath)} is not a supported image type.`);
+}
+
+export async function setWallpaper(imagePath: string): Promise<void> {
+  await assertApplicable(imagePath);
+  await writeWallpaperStore(WALLPAPER_STORE_PATH, imagePath);
+  await restartWallpaperAgent();
+
+  const deadline = Date.now() + 5000;
+  let shown: string[] = [];
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    shown = await readWallpapers();
+    if (shown.length > 0 && shown.every((p) => p === imagePath)) return;
+  }
+  throw new Error(`macOS still shows ${shown.join(', ') || 'no wallpaper'} after setting ${imagePath}.`);
 }

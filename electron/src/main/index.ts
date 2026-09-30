@@ -1,41 +1,91 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, screen } from 'electron';
-import path from 'path';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, protocol, screen, shell, systemPreferences } from 'electron';
 import fs from 'fs';
-import * as persistence from './persistence';
-import { applyWallpaper, getScreenSize } from './wallpaper';
-import { randomUUID } from 'crypto';
+import os from 'os';
+import path from 'path';
+import type { BootState, MenuCommand, WallpaperState } from '../shared/api';
+import { countImages, listFolder } from './files';
+import { readPrefs, writePrefs, type Prefs } from './prefs';
+import { readWallpapers, setWallpaper } from './wallpaper';
 
 const isDev = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
+let prefs: Prefs | null = null;
+let watcher: fs.FSWatcher | null = null;
+// Wallpaper changes run one at a time so rapid Returns or Undos cannot interleave.
+let wallpaperQueue: Promise<unknown> = Promise.resolve();
 
-function applyFailureSuggestion(message: string): string {
-  if (/not authorized to send apple events to system events/i.test(message) || /-1743/.test(message)) {
-    return 'Allow Automation for System Events in System Settings > Privacy & Security > Automation, then retry.';
-  }
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'wp', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+]);
 
-  if (/synchronize wallpaper across spaces/i.test(message)) {
-    return 'Open System Settings > Wallpaper and set this image to “Show on All Spaces”, then retry Apply.';
-  }
-
-  return 'Try another image or retry.';
+function prefsFile(): string {
+  return path.join(app.getPath('userData'), 'prefs.json');
 }
 
-function createWindow() {
+function currentPrefs(): Prefs {
+  if (!prefs) throw new Error('Settings were not loaded.');
+  return prefs;
+}
+
+function updatePrefs(change: (draft: Prefs) => void): Prefs {
+  const next = structuredClone(currentPrefs());
+  change(next);
+  writePrefs(prefsFile(), next);
+  prefs = next;
+  return next;
+}
+
+function sendMenu(command: MenuCommand): void {
+  mainWindow?.webContents.send('menu', command);
+}
+
+function buildMenu(): void {
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { role: 'appMenu' },
+    {
+      label: 'File',
+      submenu: [
+        { label: 'Open Folder…', accelerator: 'CmdOrCtrl+O', click: () => sendMenu('open-folder') },
+        { type: 'separator' },
+        { role: 'close' },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { label: 'Undo Wallpaper Change', accelerator: 'CmdOrCtrl+Z', click: () => sendMenu('undo') },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        ...(isDev ? [{ role: 'reload' as const }, { role: 'toggleDevTools' as const }, { type: 'separator' as const }] : []),
+        { role: 'togglefullscreen' },
+      ],
+    },
+    { role: 'windowMenu' },
+  ]));
+}
+
+function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 720,
-    minWidth: 900,
-    minHeight: 620,
+    width: 1200,
+    height: 800,
+    minWidth: 860,
+    minHeight: 600,
+    title: 'Wallpaper',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 18 },
-    backgroundColor: '#F5EDE0',
+    vibrancy: 'sidebar',
+    visualEffectState: 'followWindow',
+    backgroundColor: '#00000000',
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
 
@@ -45,130 +95,129 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   }
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
-  });
-
+  mainWindow.once('ready-to-show', () => mainWindow?.show());
   mainWindow.on('closed', () => {
     mainWindow = null;
+    watcher?.close();
+    watcher = null;
   });
 }
 
-function generatedDir(): string {
-  return path.join(app.getPath('userData'), 'Generated');
+// Serves wp://image/?path=…&size=… as a JPEG thumbnail rendered by Quick Look,
+// so the grid never decodes full-size originals.
+function registerImageProtocol(): void {
+  protocol.handle('wp', async (request) => {
+    const url = new URL(request.url);
+    const file = url.searchParams.get('path');
+    const size = Number(url.searchParams.get('size'));
+    if (!file || !Number.isFinite(size) || size <= 0) {
+      return new Response('Bad image request', { status: 400 });
+    }
+    try {
+      const image = await nativeImage.createThumbnailFromPath(file, { width: size, height: size });
+      return new Response(new Uint8Array(image.toJPEG(90)), {
+        headers: { 'content-type': 'image/jpeg', 'cache-control': 'max-age=31536000, immutable' },
+      });
+    } catch (error) {
+      return new Response(`Could not render ${file}: ${(error as Error).message}`, { status: 500 });
+    }
+  });
+}
+
+async function changeWallpaper(change: () => Promise<WallpaperState>): Promise<WallpaperState> {
+  const next = wallpaperQueue.then(change);
+  wallpaperQueue = next.catch(() => undefined);
+  return next;
+}
+
+function registerIPC(): void {
+  ipcMain.handle('boot', async (): Promise<BootState> => {
+    prefs = readPrefs(prefsFile());
+    const [wallpaper] = await readWallpapers();
+    const { width, height } = screen.getPrimaryDisplay().size;
+    return {
+      home: os.homedir(),
+      folders: prefs.folders,
+      lastFolder: prefs.lastFolder,
+      wallpaper,
+      canUndo: prefs.undo.length > 0,
+      screen: { width, height },
+      accentColor: `#${systemPreferences.getAccentColor().slice(0, 6)}`,
+    };
+  });
+
+  ipcMain.handle('list-folder', (_event, dir: string) => listFolder(dir));
+  ipcMain.handle('count-images', (_event, dir: string) => countImages(dir));
+
+  ipcMain.handle('set-wallpaper', (_event, imagePath: string) => changeWallpaper(async () => {
+    const [previous] = await readWallpapers();
+    await setWallpaper(imagePath);
+    const next = updatePrefs((draft) => {
+      if (previous && previous !== imagePath) draft.undo.push(previous);
+    });
+    return { wallpaper: imagePath, canUndo: next.undo.length > 0 };
+  }));
+
+  ipcMain.handle('undo-wallpaper', () => changeWallpaper(async () => {
+    const target = currentPrefs().undo.at(-1);
+    if (!target) throw new Error('There is no earlier wallpaper to go back to.');
+    try {
+      await setWallpaper(target);
+    } catch (error) {
+      // A wallpaper file that has since been moved or deleted can never be
+      // restored, so drop it and tell the user; other failures keep it.
+      if (!fs.existsSync(target)) updatePrefs((draft) => { draft.undo.pop(); });
+      throw error;
+    }
+    const next = updatePrefs((draft) => { draft.undo.pop(); });
+    return { wallpaper: target, canUndo: next.undo.length > 0 };
+  }));
+
+  ipcMain.handle('choose-folder', async () => {
+    if (!mainWindow) throw new Error('The window is closed.');
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+      defaultPath: currentPrefs().lastFolder ?? os.homedir(),
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+
+  ipcMain.handle('add-folder', (_event, dir: string) => {
+    const home = os.homedir();
+    return updatePrefs((draft) => {
+      if (dir !== home && !draft.folders.includes(dir)) draft.folders.push(dir);
+    }).folders;
+  });
+
+  ipcMain.handle('remove-folder', (_event, dir: string) =>
+    updatePrefs((draft) => { draft.folders = draft.folders.filter((folder) => folder !== dir); }).folders);
+
+  ipcMain.handle('remember-folder', (_event, dir: string) => {
+    updatePrefs((draft) => { draft.lastFolder = dir; });
+  });
+
+  ipcMain.handle('watch-folder', (event, dir: string) => {
+    watcher?.close();
+    let timer: NodeJS.Timeout | undefined;
+    watcher = fs.watch(dir, () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => event.sender.send('folder-changed', dir), 200);
+    });
+    watcher.on('error', () => {
+      watcher?.close();
+      watcher = null;
+      event.sender.send('folder-changed', dir);
+    });
+  });
+
+  ipcMain.handle('reveal-in-finder', (_event, target: string) => shell.showItemInFolder(target));
 }
 
 app.whenReady().then(() => {
-  protocol.handle('local-file', (request) => {
-    const filePath = decodeURIComponent(request.url.replace('local-file://', ''));
-    return net.fetch(`file://${filePath}`);
-  });
-
+  registerImageProtocol();
   registerIPC();
+  buildMenu();
   createWindow();
 });
 
-app.on('window-all-closed', () => {
-  app.quit();
-});
-
-function registerIPC() {
-  ipcMain.handle('app:bootstrap', async () => {
-    try {
-      return persistence.bootstrap();
-    } catch (error: any) {
-      return { error: true, code: 'persistence_failed', message: error.message, suggestion: '' };
-    }
-  });
-
-  ipcMain.handle('app:apply', async (_event, filePath: string) => {
-    try {
-      applyWallpaper(filePath);
-
-      const entry = {
-        id: randomUUID(),
-        fileURL: filePath,
-        createdAt: new Date().toISOString(),
-        source: 'localImage',
-        metadata: {},
-      };
-      persistence.addHistoryEntry(entry);
-      persistence.saveLastApplied(filePath);
-
-      return { success: true, message: 'Wallpaper applied.', entry };
-    } catch (error: any) {
-      return {
-        error: true,
-        code: 'apply_failed',
-        message: error.message,
-        suggestion: applyFailureSuggestion(error.message ?? ''),
-      };
-    }
-  });
-
-  ipcMain.handle('app:save-rendered-image', async (_event, imageData: Uint8Array) => {
-    try {
-      const dir = generatedDir();
-      fs.mkdirSync(dir, { recursive: true });
-
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const filename = `goals-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.png`;
-      const filePath = path.join(dir, filename);
-
-      fs.writeFileSync(filePath, Buffer.from(imageData));
-
-      const { width, height } = getScreenSize();
-      return { success: true, fileURL: filePath, width, height };
-    } catch (error: any) {
-      return { error: true, code: 'render_failed', message: error.message, suggestion: 'Try again.' };
-    }
-  });
-
-  ipcMain.handle('app:save-draft', async (_event, json: string) => {
-    try {
-      persistence.saveGoalsDraft(JSON.parse(json));
-      return { success: true };
-    } catch (error: any) {
-      return { error: true, code: 'persistence_failed', message: error.message, suggestion: '' };
-    }
-  });
-
-  ipcMain.handle('app:delete-history', async (_event, id: string) => {
-    try {
-      persistence.deleteHistoryEntry(id);
-      return { success: true };
-    } catch (error: any) {
-      return { error: true, code: 'persistence_failed', message: error.message, suggestion: '' };
-    }
-  });
-
-  ipcMain.handle('app:clear-history', async () => {
-    try {
-      persistence.clearHistory();
-      return { success: true };
-    } catch (error: any) {
-      return { error: true, code: 'persistence_failed', message: error.message, suggestion: '' };
-    }
-  });
-
-  ipcMain.handle('app:screen-info', async () => {
-    return getScreenSize();
-  });
-
-  ipcMain.handle('dialog:open-file', async () => {
-    if (!mainWindow) return null;
-    const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openFile'],
-      filters: [
-        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'heic', 'bmp', 'tiff', 'webp'] },
-      ],
-    });
-    if (result.canceled || result.filePaths.length === 0) return null;
-    return result.filePaths[0];
-  });
-
-  ipcMain.handle('shell:show-in-finder', async (_event, filePath: string) => {
-    shell.showItemInFolder(filePath);
-  });
-}
+app.on('window-all-closed', () => app.quit());

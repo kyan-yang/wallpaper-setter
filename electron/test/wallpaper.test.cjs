@@ -1,158 +1,81 @@
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { applyWallpaper, buildWallpaperApplyCommand, patchWallpaperStoreXml } = require('../dist/main/wallpaper.js');
+const { WALLPAPER_STORE_PATH, assertApplicable, writeWallpaperStore } = require('../dist/main/wallpaper.js');
 
-test('buildWallpaperApplyCommand targets every desktop via System Events', () => {
-  const filePath = '/tmp/example wallpaper.jpg';
-  const { command, args } = buildWallpaperApplyCommand(filePath);
+// Runs against a copy of this Mac's real WallpaperAgent store, so the test
+// exercises the layout macOS actually writes. The live store is only read.
+function copyLiveStore() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wallpaper-store-'));
+  const copy = path.join(dir, 'Index.plist');
+  fs.copyFileSync(WALLPAPER_STORE_PATH, copy);
+  return { dir, copy };
+}
 
-  assert.equal(command, 'osascript');
-  assert.equal(args[args.length - 1], filePath);
-  assert.match(args.join('\n'), /tell application "System Events"/);
-  assert.match(args.join('\n'), /repeat with desktopRef in desktops/);
-});
+function readStore(file) {
+  return execFileSync('/usr/bin/plutil', ['-convert', 'xml1', '-o', '-', file], { encoding: 'utf8' });
+}
 
-test('applyWallpaper rejects missing files', () => {
-  assert.throws(
-    () => applyWallpaper('/tmp/missing.jpg', { existsSync: () => false, execSync: () => undefined }),
-    /File not found/
-  );
-});
+function extract(file, keyPath) {
+  return execFileSync('/usr/bin/plutil', ['-extract', keyPath, 'raw', '-o', '-', file], { encoding: 'utf8' }).trim();
+}
 
-test('applyWallpaper rejects unsupported file formats', () => {
-  assert.throws(
-    () => applyWallpaper('/tmp/wallpaper.svg', { existsSync: () => true, execSync: () => undefined }),
-    /Unsupported format: svg/
-  );
-});
-
-test('applyWallpaper executes osascript when wallpaper store is unavailable', () => {
-  const calls = [];
-  const filePath = '/tmp/wallpaper.png';
-
-  applyWallpaper(filePath, {
-    existsSync: (targetPath) => targetPath === filePath,
-    execSync: (command, args, options) => {
-      calls.push({ command, args, options });
-      return undefined;
-    },
-  });
-
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].command, 'osascript');
-  assert.equal(calls[0].args[calls[0].args.length - 1], filePath);
-  assert.deepEqual(calls[0].options, { timeout: 10000 });
-});
-
-test('patchWallpaperStoreXml updates every relative wallpaper file reference', () => {
-  const storeXml = [
-    '<plist version="1.0"><dict>',
-    '<key>Spaces</key><dict>',
-    '<key>A</key><dict><key>relative</key><string>file:///old-a.jpg</string></dict>',
-    '<key>B</key><dict><key>relative</key><string>file:///old-b.jpg</string></dict>',
-    '</dict>',
-    '<key>SystemDefault</key><dict><key>relative</key><string>file:///old-default.jpg</string></dict>',
-    '</dict></plist>',
-  ].join('');
-
-  const nextURL = 'file:///Users/example/new & wallpaper.jpg';
-  const result = patchWallpaperStoreXml(storeXml, nextURL);
-
-  assert.equal(result.updates, 3);
-  assert.match(result.rawStoreXml, /file:\/\/\/Users\/example\/new &amp; wallpaper\.jpg/);
-  assert.doesNotMatch(result.rawStoreXml, /file:\/\/\/old-/);
-});
-
-test('applyWallpaper patches wallpaper store and refreshes wallpaper agent', () => {
-  const filePath = '/tmp/wallpaper space.png';
-  const commandCalls = [];
-  let rewrittenStore = '';
-
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wallpaper-test-'));
-  const homeDir = path.join(tempRoot, 'home');
-  const storePath = path.join(homeDir, 'Library', 'Application Support', 'com.apple.wallpaper', 'Store', 'Index.plist');
-  fs.mkdirSync(path.dirname(storePath), { recursive: true });
-  fs.writeFileSync(storePath, 'placeholder');
-
-  const sampleStoreXml = [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<plist version="1.0">',
-    '<dict>',
-    '<key>Spaces</key>',
-    '<dict>',
-    '<key>Space1</key>',
-    '<dict>',
-    '<key>Default</key>',
-    '<dict>',
-    '<key>Desktop</key>',
-    '<dict>',
-    '<key>Content</key>',
-    '<dict>',
-    '<key>Choices</key>',
-    '<array>',
-    '<dict>',
-    '<key>Files</key>',
-    '<array>',
-    '<dict><key>relative</key><string>file:///old.jpg</string></dict>',
-    '</array>',
-    '</dict>',
-    '</array>',
-    '</dict>',
-    '</dict>',
-    '</dict>',
-    '</dict>',
-    '</dict>',
-    '</dict>',
-    '</plist>',
-  ].join('');
-
+test('writeWallpaperStore puts one image on every Space and display', async () => {
+  const { dir, copy } = copyLiveStore();
+  const image = path.join(os.homedir(), 'Pictures', 'a wallpaper & more.jpg');
+  const idleBefore = extract(copy, 'AllSpacesAndDisplays.Idle.Content.Choices.0.Provider');
   try {
-    applyWallpaper(filePath, {
-      existsSync: (targetPath) => targetPath === filePath || targetPath === storePath || fs.existsSync(targetPath),
-      homedir: () => homeDir,
-      tmpdir: () => tempRoot,
-      execSync: (command, args, options) => {
-        commandCalls.push({ command, args, options });
+    await writeWallpaperStore(copy, image);
+    const url = `file://${encodeURI(image).replaceAll('&', '&amp;')}`;
+    const xml = readStore(copy);
 
-        if (command === 'plutil' && args[0] === '-convert' && args[1] === 'xml1') {
-          const xmlPath = args[3];
-          fs.writeFileSync(xmlPath, sampleStoreXml);
-        }
-
-        if (command === 'plutil' && args[0] === '-convert' && args[1] === 'binary1') {
-          rewrittenStore = fs.readFileSync(args[4], 'utf8');
-        }
-
-        return undefined;
-      },
-    });
+    assert.equal(extract(copy, 'AllSpacesAndDisplays.Type'), 'individual');
+    assert.equal(extract(copy, 'AllSpacesAndDisplays.Desktop.Content.Choices.0.Provider'), 'com.apple.wallpaper.choice.image');
+    assert.equal(extract(copy, 'SystemDefault.Desktop.Content.Choices.0.Files.0.relative'), `file://${encodeURI(image)}`);
+    assert.equal(extract(copy, 'AllSpacesAndDisplays.Idle.Content.Choices.0.Provider'), idleBefore);
+    assert.match(xml, /<key>Spaces<\/key>\s*<dict\/>/);
+    assert.match(xml, /<key>Displays<\/key>\s*<dict\/>/);
+    assert.ok(xml.includes(url));
   } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
   }
-
-  assert.equal(commandCalls[0].command, 'osascript');
-  assert.ok(commandCalls.some((call) => call.command === 'plutil' && call.args[1] === 'xml1'));
-  assert.ok(commandCalls.some((call) => call.command === 'plutil' && call.args[1] === 'binary1'));
-  assert.ok(commandCalls.some((call) => call.command === 'killall' && call.args[0] === 'WallpaperAgent'));
-
-  assert.match(rewrittenStore, /file:\/\/\/tmp\/wallpaper%20space\.png/);
 });
 
-test('applyWallpaper surfaces AppleScript stderr details', () => {
-  const error = new Error('Command failed');
-  error.stderr = Buffer.from('Not authorized to send Apple events to System Events.\n');
+test('writeWallpaperStore refuses a store layout it does not recognize', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wallpaper-store-'));
+  const store = path.join(dir, 'Index.plist');
+  fs.writeFileSync(store, JSON.stringify({ Displays: {}, Linked: {} }));
+  execFileSync('/usr/bin/plutil', ['-convert', 'binary1', store]);
+  try {
+    await assert.rejects(writeWallpaperStore(store, '/tmp/x.jpg'), /layout this app does not support/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
-  assert.throws(
-    () => applyWallpaper('/tmp/wallpaper.jpg', {
-      existsSync: () => true,
-      execSync: () => {
-        throw error;
-      },
-    }),
-    /Not authorized to send Apple events to System Events/
-  );
+test('writeWallpaperStore refuses the second store newer macOS versions add', async () => {
+  const { dir, copy } = copyLiveStore();
+  fs.writeFileSync(path.join(dir, 'Index2.plist'), '');
+  try {
+    await assert.rejects(writeWallpaperStore(copy, '/tmp/x.jpg'), /second wallpaper store/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('assertApplicable rejects missing files and unsupported types', async () => {
+  await assert.rejects(assertApplicable('/tmp/does-not-exist.jpg'), /no longer exists/);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wallpaper-file-'));
+  const svg = path.join(dir, 'art.svg');
+  fs.writeFileSync(svg, '<svg/>');
+  try {
+    await assert.rejects(assertApplicable(svg), /not a supported image type/);
+    await assert.rejects(assertApplicable(dir), /not a file/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

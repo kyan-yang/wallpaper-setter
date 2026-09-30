@@ -1,22 +1,18 @@
 {
   "name": "wallpaper-setter",
-  "version": "1.0.0",
-  "description": "Premium wallpaper setter with goals overlay",
+  "productName": "WallpaperSetter",
+  "version": "2.0.0",
+  "description": "Browse your folders, preview, and set your Mac wallpaper on every display and Space",
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "npm run build:main && concurrently -k \"vite --config vite.config.ts\" \"electronmon .\"",
-    "build:main": "tsc -p tsconfig.node.json",
+    "build:main": "rm -rf dist && tsc -p tsconfig.node.json",
     "build:renderer": "vite build --config vite.config.ts",
     "build": "npm run build:main && npm run build:renderer",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json --noEmit",
     "start": "electron .",
-    "test": "npm run build:main && node --test test/**/*.test.cjs",
-    "package": "npm run build && electron-builder",
+    "test": "npm run build:main && node --test test/*.test.cjs",
     "package:app": "npm run build && electron-builder --mac dir --publish never"
-  },
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-colorful": "^5.6.1",
-    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
@@ -26,17 +22,25 @@
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
     "electronmon": "^2.0.3",
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "typescript": "^5.7.2",
     "vite": "^6.0.5"
   },
   "build": {
     "appId": "com.wallpapersetter.app",
     "productName": "WallpaperSetter",
-    "mac": {
-      "target": "dmg"
+    "directories": {
+      "output": "release"
     },
     "files": [
-      "dist/**/*"
-    ]
+      "dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": "dmg"
+    }
   }
 }
