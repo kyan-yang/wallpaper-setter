@@ -1,10 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, protocol, screen, shell, systemPreferences } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, screen, shell, systemPreferences } from 'electron';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import type { BootState, MenuCommand, WallpaperState } from '../shared/api';
 import { countImages, listFolder } from './files';
 import { readPrefs, writePrefs, type Prefs } from './prefs';
+import { thumbnail } from './thumbnails';
 import { readWallpapers, setWallpaper } from './wallpaper';
 
 const isDev = !app.isPackaged;
@@ -103,8 +104,8 @@ function createWindow(): void {
   });
 }
 
-// Serves wp://image/?path=…&size=… as a JPEG thumbnail rendered by Quick Look,
-// so the grid never decodes full-size originals.
+// Serves wp://image/?path=…&size=… as a cached JPEG thumbnail, so the UI
+// never decodes full-size originals and HEIC files display too.
 function registerImageProtocol(): void {
   protocol.handle('wp', async (request) => {
     const url = new URL(request.url);
@@ -114,12 +115,12 @@ function registerImageProtocol(): void {
       return new Response('Bad image request', { status: 400 });
     }
     try {
-      const image = await nativeImage.createThumbnailFromPath(file, { width: size, height: size });
-      return new Response(new Uint8Array(image.toJPEG(90)), {
+      const jpeg = await fs.promises.readFile(await thumbnail(file, size));
+      return new Response(new Uint8Array(jpeg), {
         headers: { 'content-type': 'image/jpeg', 'cache-control': 'max-age=31536000, immutable' },
       });
     } catch (error) {
-      return new Response(`Could not render ${file}: ${(error as Error).message}`, { status: 500 });
+      return new Response((error as Error).message, { status: 500 });
     }
   });
 }
