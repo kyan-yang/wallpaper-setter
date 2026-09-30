@@ -6,7 +6,7 @@ This project is in setup phase. Prioritize foundations that unlock rapid UI iter
 ## Vision
 Build a wallpaper setter app with premium UI/UX: fast browsing, delightful previews, and safe one-click wallpaper apply.
 
-The app does one job: set the Mac background from the user's own images. Browse folders, preview, set, undo. Do not add features inferred from usage data or adjacent ideas (goals text, image generators, online sources) unless the user asks for them.
+The app does one job: set the Mac background from the user's own images. Browse folders, preview, set, undo. Do not add features beyond that job unless the user asks for them.
 
 ## Product Principles
 - UX polish is a core requirement, not a nice-to-have.
@@ -42,9 +42,9 @@ The app does one job: set the Mac background from the user's own images. Browse 
 - Co-locate component, styles, and tests when it improves maintainability.
 - Extract reusable UI primitives early (buttons, cards, modals, grid items).
 - Avoid duplicate utility modules with overlapping purposes.
-- **The entire app is Electron** (`electron/`). There is no Swift code. Persistence is `prefs.json` via Node.js; thumbnails come from Quick Look through the `wp://` protocol.
+- **The entire app is Electron** (`electron/`). Persistence is `prefs.json` via Node.js; thumbnails are cached `sips` conversions served through the `wp://` protocol.
 - Wallpaper apply writes WallpaperAgent's store (`~/Library/Application Support/com.apple.wallpaper/Store/Index.plist`) in its all-Spaces form through JXA and `NSPropertyListSerialization`, restarts WallpaperAgent, then verifies with `NSWorkspace`. `NSWorkspace.setDesktopImageURL` alone changes only the current Space and switches "Show on all Spaces" back off, so it must not be used to set.
-- When migrating or replacing a module, **delete the old code, tests, and scripts immediately**. Never leave dead code behind.
+- When replacing anything, **remove every trace of what it replaced**: code, tests, scripts, docs, comments, config entries, version numbers that imply a predecessor, and data the old version left on the machine. Nothing in the repo or on disk should reveal that an earlier version existed.
 
 ## Workflow Rules
 - Start with a short plan for non-trivial changes before editing.

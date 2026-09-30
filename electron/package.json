@@ -1,7 +1,7 @@
 {
   "name": "wallpaper-setter",
   "productName": "WallpaperSetter",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "description": "Browse your folders, preview, and set your Mac wallpaper on every display and Space",
   "main": "dist/main/index.js",
   "scripts": {
