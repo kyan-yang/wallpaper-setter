@@ -6,6 +6,8 @@ This project is in setup phase. Prioritize foundations that unlock rapid UI iter
 ## Vision
 Build a wallpaper setter app with premium UI/UX: fast browsing, delightful previews, and safe one-click wallpaper apply.
 
+The app does one job: set the Mac background from the user's own images. Browse folders, preview, set, undo. Do not add features inferred from usage data or adjacent ideas (goals text, image generators, online sources) unless the user asks for them.
+
 ## Product Principles
 - UX polish is a core requirement, not a nice-to-have.
 - Minimize friction: users should get from launch to applied wallpaper in seconds.
@@ -23,10 +25,10 @@ Build a wallpaper setter app with premium UI/UX: fast browsing, delightful previ
 
 ## Technical Direction
 - Core experience should include:
-  - Wallpaper library/grid view
-  - Fast preview flow
-  - Safe apply flow with confirmation/feedback
-  - Last applied wallpaper memory
+  - A folder tree over the user's own files and a grid of the open folder's images, with no import step
+  - A preview cropped exactly as the display will show it
+  - Safe apply to every display and Space with confirmation/feedback, plus undo
+  - The current wallpaper as macOS reports it, never a remembered copy
 - Separate UI state from system/apply logic.
 - Keep platform integration behind a thin adapter layer so UI can evolve independently.
 - Favor local-first behavior (fast start, resilient without network dependency).
@@ -40,7 +42,8 @@ Build a wallpaper setter app with premium UI/UX: fast browsing, delightful previ
 - Co-locate component, styles, and tests when it improves maintainability.
 - Extract reusable UI primitives early (buttons, cards, modals, grid items).
 - Avoid duplicate utility modules with overlapping purposes.
-- **The entire app is Electron** (`electron/`). There is no Swift code. Wallpaper apply uses `osascript`, persistence is JSON via Node.js, goals rendering uses Canvas in the renderer process.
+- **The entire app is Electron** (`electron/`). There is no Swift code. Persistence is `prefs.json` via Node.js; thumbnails come from Quick Look through the `wp://` protocol.
+- Wallpaper apply writes WallpaperAgent's store (`~/Library/Application Support/com.apple.wallpaper/Store/Index.plist`) in its all-Spaces form through JXA and `NSPropertyListSerialization`, restarts WallpaperAgent, then verifies with `NSWorkspace`. `NSWorkspace.setDesktopImageURL` alone changes only the current Space and switches "Show on all Spaces" back off, so it must not be used to set.
 - When migrating or replacing a module, **delete the old code, tests, and scripts immediately**. Never leave dead code behind.
 
 ## Workflow Rules

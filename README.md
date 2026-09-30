@@ -1,11 +1,11 @@
 # Wallpaper Setter
 
-Local-first macOS wallpaper app with fast preview, safe apply, and goals wallpaper generation. Built with Electron + React.
+A macOS app for setting your background from your own images. Browse your folders, preview an image cropped exactly as your display will show it, and set it on every display and Space. Undo puts the previous wallpaper back.
 
 ## Prerequisites
 
-- macOS 13+ (Ventura or later)
-- Node.js 18+
+- macOS 15 (Sequoia)
+- Node.js 20+
 
 ## Quick Start
 
@@ -14,49 +14,38 @@ cd electron && npm install
 npm run dev
 ```
 
-## Packaging
+## Keyboard
 
-Local macOS packaging:
+| Key | Action |
+| --- | --- |
+| Arrow keys | Browse images |
+| Space | Full preview |
+| Return | Set as wallpaper |
+| ⌘Z | Undo the last wallpaper change |
+| ⌘O | Open any folder |
+
+## Packaging
 
 ```bash
 npm run release:local
 ```
 
-Equivalent manual steps:
-
-```bash
-./scripts/build-app.sh
-./scripts/package-dmg.sh
-```
-
-Output artifacts:
-
-- `dist/WallpaperSetter.app`
-- `dist/WallpaperSetter-<version>.dmg`
+This builds `dist/WallpaperSetter.app` and `dist/WallpaperSetter-<version>.dmg`.
 
 ## Architecture
 
 ```
 electron/
-  src/main/               # Electron main process (wallpaper apply via osascript, JSON persistence)
-  src/preload/            # Context bridge
-  src/renderer/           # React UI (goals canvas rendering + custom theme colors)
+  src/main/       # window, IPC, wallpaper apply, folder listing, thumbnails, prefs
+  src/preload/    # exposes the typed API from src/shared/api.ts as window.api
+  src/shared/     # IPC contract shared by main and renderer
+  src/renderer/   # React UI
 ```
 
-- **Main process**: Manages window, applies wallpaper via `osascript`, persists state as JSON via Node.js
-- **Renderer**: React UI with goals wallpaper generation on Canvas
-
-## Current Scope
-
-- Import local images (file picker + drag & drop)
-- Preview selected/generated wallpaper
-- Apply wallpaper to all displays via `osascript`
-- Generate goals wallpaper with custom theme colors
-- Persist history, last applied wallpaper, and goals draft
-- Delete entry / clear history
+macOS has no public API that sets one wallpaper on every Space. The app writes WallpaperAgent's store in its all-Spaces form (the state System Settings writes when "Show on all Spaces" is on), restarts WallpaperAgent, and confirms through `NSWorkspace` that every display shows the new image. If macOS changes the store's layout, applying fails with an error instead of guessing.
 
 ## Known Limitations
 
-- macOS-only
-- Same image applied to all displays (no per-display selection yet)
-- Supported formats: `jpg`, `jpeg`, `png`, `gif`, `heic`, `bmp`, `tiff`, `webp`
+- macOS only.
+- Every display gets the same image.
+- Supported formats: `jpg`, `jpeg`, `png`, `heic`, `heif`, `tif`, `tiff`, `gif`, `bmp`, `webp`.

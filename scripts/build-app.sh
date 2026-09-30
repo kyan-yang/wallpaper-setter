@@ -16,13 +16,13 @@ npm run package:app --prefix "$ELECTRON_DIR"
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 
-APP_FROM_BUILD="$(find "$ELECTRON_DIR/dist" -maxdepth 4 -type d -name "${PRODUCT_NAME}.app" | head -n 1)"
+APP_FROM_BUILD="$(find "$ELECTRON_DIR/release" -maxdepth 4 -type d -name "${PRODUCT_NAME}.app" | head -n 1)"
 if [[ -z "$APP_FROM_BUILD" ]]; then
-  APP_FROM_BUILD="$(find "$ELECTRON_DIR/dist" -maxdepth 4 -type d -name "*.app" | head -n 1)"
+  APP_FROM_BUILD="$(find "$ELECTRON_DIR/release" -maxdepth 4 -type d -name "*.app" | head -n 1)"
 fi
 
 if [[ -z "$APP_FROM_BUILD" ]]; then
-  echo "No .app bundle found under $ELECTRON_DIR/dist"
+  echo "No .app bundle found under $ELECTRON_DIR/release"
   exit 1
 fi
 

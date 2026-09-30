@@ -1,48 +1,31 @@
 # Manual QA Checklist
 
-## Multi-display Apply
+## Browse
 
-- Connect 2+ displays.
-- Select a valid wallpaper.
-- Click `Apply`.
-- Expected: wallpaper updates on all displays with no silent failure.
+- Launch the app. Expected: the folder holding the current wallpaper (or the last folder you opened) is open and revealed in the tree, and the current wallpaper is selected and badged.
+- Expand folders in the tree with the mouse and with the arrow keys. Expected: image counts appear beside folders that hold images.
+- Move through the grid with the arrow keys. Expected: the preview updates immediately and sharpens a moment later.
+- Save a new image into the open folder from Finder. Expected: it appears at the top of the grid without reopening the folder.
 
-## Missing File Failure
+## Preview
 
-- Apply an image so it appears in history.
-- Move or delete the image file in Finder.
-- Try to apply/select it again.
-- Expected: visible error banner with actionable message.
+- Press Space. Expected: a full-window preview cropped to the display's aspect ratio; arrows keep browsing; Escape or Space closes it.
 
-## Unsupported Format Failure
+## Set and undo
 
-- Try to import an unsupported file type.
-- Expected: user-visible format failure (no crash, no silent fallback).
+- Press Return on an image. Expected: the button shows progress, then a confirmation, and the Current badge moves.
+- Switch to every other Space and connect a second display. Expected: all of them show the new image.
+- Press ⌘Z. Expected: the previous wallpaper returns everywhere.
+- Undo until nothing is left. Expected: Undo is disabled.
 
-## Relaunch Persistence
+## Adding folders
 
-- Set goals draft text and apply a wallpaper.
-- Quit the app and relaunch.
-- Expected: history, goals draft, and last applied selection are restored.
+- Press ⌘O and pick a folder outside your home folder. Expected: it is added to the tree and opened.
+- Drop a folder on the window. Expected: same as ⌘O. Drop an image. Expected: its folder opens with the image selected.
+- Remove an added folder from the tree. Expected: it disappears and the files are untouched.
 
-## History Delete Confirmation
+## Failures
 
-- With at least one history entry, click `Delete`.
-- Expected: confirmation appears.
-- Confirm delete.
-- Expected: entry is removed and persisted.
-
-## History Clear Confirmation
-
-- With non-empty history, click `Clear All`.
-- Expected: confirmation appears.
-- Confirm clear.
-- Expected: all entries are removed and persisted.
-
-## Goals Generation Flow
-
-- Enter title/goals and choose theme.
-- Click `Generate Preview`.
-- Expected: preview updates to generated image.
-- Click `Apply`.
-- Expected: generated wallpaper applies and appears in history.
+- Deny access to Desktop or Documents when macOS asks, then open that folder. Expected: an error explaining where to allow access.
+- Delete the selected image in Finder, then press Return. Expected: a persistent error saying the file no longer exists.
+- Corrupt `~/Library/Application Support/WallpaperSetter/prefs.json`, then launch. Expected: a full-window error naming the file.
